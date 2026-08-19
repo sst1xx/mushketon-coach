@@ -277,3 +277,17 @@ zoomMode === 'zoom8'  → "8-10"  // ещё больше zoom
 - Переключение "1-10" ↔ "7-10" корректно масштабирует всё туда-обратно
 
 **Deployment:** Готов к production
+
+**Deployment:**
+- Commit: `87d9c1d`
+- Production URL: https://musketoon-coach.pages.dev
+- Preview URL: https://bb349edb.musketoon-coach.pages.dev
+- Status: ✅ Live
+
+**Проверка:**
+1. Открой https://musketoon-coach.pages.dev
+2. Создай/открой тренировку
+3. Кликни кнопку "1-10" → переключится на "7-10"
+4. **Мишень увеличится** — центральная зона займёт весь экран
+5. Сделай выстрел в центр → должен дать 10.9
+6. Переключи обратно на "1-10" → мишень вернётся к полному виду
