@@ -14,35 +14,33 @@ const RING_D: Record<number, number> = {
   9: 27.5, 10: 11.5,
 };
 
-// Ring labels: ring number, label radius (mm from center), text color
-const RING_LABELS_FULL = [
-  { n: 9, r: RING_D[9]     / 2 + 2.5, color: 'white' as const },
-  { n: 8, r: RING_D[8]     / 2 + 2.5, color: 'white' as const },
-  { n: 7, r: RING_D[7]     / 2 + 2.5, color: 'white' as const },
-  { n: 6, r: RING_D[6]     / 2 + 2.5, color: 'black' as const },
-  { n: 5, r: RING_D[5]     / 2 + 2.5, color: 'black' as const },
-  { n: 4, r: RING_D[4]     / 2 + 2.5, color: 'black' as const },
-  { n: 3, r: RING_D[3]     / 2 + 2.5, color: 'black' as const },
-  { n: 2, r: RING_D[2]     / 2 + 2.5, color: 'black' as const },
-  { n: 1, r: RING_D[1]     / 2 + 2.5, color: 'black' as const },
-];
+// Ring labels: each digit is centered in the 8 mm band between its own ring
+// boundary and the next inner boundary. No ring 10 label is rendered.
+const ZOOM7_SCALE = 80 / (RING_D[7] / 2);
 
-const RING_LABELS_ZOOM7 = [
-  { n: 10, r: RING_D[10] / 2 + 2.5, color: 'white' as const },
-  { n: 9,  r: RING_D[9]  / 2 + 2.5, color: 'white' as const },
-  { n: 8,  r: RING_D[8]  / 2 + 2.5, color: 'white' as const },
-  { n: 7,  r: RING_D[7]  / 2 + 2.5, color: 'white' as const },
-];
+type LabelEntry = { n: number; r: number; color: 'white' | 'black' };
+
+export function computeRingLabels(zoomMode: 'full' | 'zoom7'): LabelEntry[] {
+  const scale = zoomMode === 'zoom7' ? ZOOM7_SCALE : 1;
+  const ringNumbers = zoomMode === 'zoom7' ? [9, 8, 7] : [9, 8, 7, 6, 5, 4, 3, 2, 1];
+  return ringNumbers.map(n => ({
+    n,
+    // Center of the band between ring n and ring n + 1
+    r: ((RING_D[n] / 2 + RING_D[n + 1] / 2) / 2) * scale,
+    color: n >= 7 ? 'white' : 'black',
+  }));
+}
 
 const LABEL_FONT_FULL = 3.5;
 const LABEL_FONT_ZOOM7 = 5;
 
-// Label directions: [dx, dy, textAnchor, dominantBaseline]
-const LABEL_DIRS: Array<[number, number, string, string]> = [
-  [0, -1, 'middle', 'auto'],
-  [0,    1, 'middle', 'hanging'],
-  [-1, 0, 'end',      'middle'],
-  [1,    0, 'start',    'middle'],
+// Label directions: all use centered anchors; the direction only changes the
+// sign of the coordinate offset from the target center.
+const LABEL_DIRS: Array<[number, number]> = [
+  [0, -1],
+  [0, 1],
+  [-1, 0],
+  [1, 0],
 ];
 
 interface Props {
@@ -178,12 +176,8 @@ export default function TargetCanvas({
     return candidates.reduce((a, b) => a.shotNumber > b.shotNumber ? a : b);
   })();
 
-  // Keep labels inside the SVG viewBox in both display modes.
   const labelFont = isZoom7 ? LABEL_FONT_ZOOM7 : LABEL_FONT_FULL;
-  const maxLabelR = CENTER - labelFont;
-  const ringLabels = isZoom7
-    ? RING_LABELS_ZOOM7.map(l => ({ ...l, r: Math.min(l.r * ZOOM_SCALE, maxLabelR) }))
-    : RING_LABELS_FULL.map(l => ({ ...l, r: Math.min(l.r, maxLabelR) }));
+  const ringLabels = computeRingLabels(zoomMode);
 
   return (
     <div
@@ -250,17 +244,17 @@ export default function TargetCanvas({
 
         {/* Ring labels (radii scaled for zoom) */}
         {ringLabels.map(({ n, r, color }) =>
-          LABEL_DIRS.map(([dx, dy, anchor, baseline]) => (
+          LABEL_DIRS.map(([dx, dy]) => (
             <text
               key={`${n}-${dx}-${dy}`}
               x={CENTER + dx * r}
               y={CENTER + dy * r}
               fontSize={labelFont}
               fill={color}
-              textAnchor={anchor}
-              dominantBaseline={baseline}
+              textAnchor="middle"
+              dominantBaseline="central"
               style={{ userSelect: 'none', pointerEvents: 'none' }}
-            >{n - 1}</text>
+            >{n}</text>
           ))
         )}
 

@@ -44,12 +44,16 @@ Inner ten: d =   5.0 мм  ← белая точка в центре
 
 ### Метки колец
 
-Числа 1–9 печатаются **снаружи** соответствующей границы по 4 направлениям.
-Кольцо 10 — без метки (слишком мало).
+Числа 1–9 печатаются **по центру полосы** соответствующего кольца по 4 направлениям
+(сверху, снизу, слева, справа). Кольцо 10 — без метки (собственной полосы не имеет).
 
 Позиции меток (по вертикальной оси, сверху):
-- Число `N` размещается сразу за границей кольца N, т.е. на радиусе `ringDiameter[N]/2 + offset`
-- `fontSize ≈ 3.5` (в единицах viewBox = мм)
+- Число `N` размещается по центру полосы между границей кольца N и границей кольца N+1:
+  `r = (RING_D[N] / 2 + RING_D[N + 1] / 2) / 2 = RING_D[N] / 2 - 4`
+  (в `zoom7` радиус умножается на `ZOOM7_SCALE`)
+- Все четыре направления используют `textAnchor="middle"` и `dominantBaseline="central"`;
+  направление меняет только знак координат
+- `fontSize ≈ 3.5` (в единицах viewBox = мм); в `zoom7` — `5`
 - Цвет: кольца 7–9 → `white` (метки внутри чёрной зоны), кольца 1–6 → `black`
 
 ---
@@ -88,39 +92,40 @@ Inner ten: d =   5.0 мм  ← белая точка в центре
 
 {/* 7. Ring labels: 1–9, 4 directions */}
 {RING_LABELS.map(({ n, r, color }) =>
-  LABEL_DIRS.map(([dx, dy, anchor, baseline]) => (
-    <text key={`${n}-${dx}`}
+  LABEL_DIRS.map(([dx, dy]) => (
+    <text key={`${n}-${dx}-${dy}`}
       x={CENTER + dx * r} y={CENTER + dy * r}
       fontSize={3.5} fill={color}
-      textAnchor={anchor} dominantBaseline={baseline}
+      textAnchor="middle" dominantBaseline="central"
       style={{ userSelect: 'none', pointerEvents: 'none' }}
     >{n}</text>
   ))
-)}
+)}}
 ```
 
 **Добавить константы меток:**
 
 ```tsx
-// Labels: ring number, radius (mm) for label position, text color
+// Labels: ring number, radius (mm) = center of the band between ring n and
+// ring n + 1; text color (white inside the black zone, black outside)
 const RING_LABELS = [
-  { n: 9, r: 27.5/2 + 2,  color: 'white' },  // inside black zone
-  { n: 8, r: 43.5/2 + 2,  color: 'white' },
-  { n: 7, r: 59.5/2 + 2,  color: 'white' },
-  { n: 6, r: 75.5/2 + 2,  color: 'black' },
-  { n: 5, r: 91.5/2 + 2,  color: 'black' },
-  { n: 4, r: 107.5/2 + 2, color: 'black' },
-  { n: 3, r: 123.5/2 + 2, color: 'black' },
-  { n: 2, r: 139.5/2 + 2, color: 'black' },
-  { n: 1, r: 155.5/2 + 2, color: 'black' },
+  { n: 9, r: (27.5/2 + 11.5/2) / 2,  color: 'white' },  // inside black zone
+  { n: 8, r: (43.5/2 + 27.5/2) / 2,  color: 'white' },
+  { n: 7, r: (59.5/2 + 43.5/2) / 2,  color: 'white' },
+  { n: 6, r: (75.5/2 + 59.5/2) / 2,  color: 'black' },
+  { n: 5, r: (91.5/2 + 75.5/2) / 2,  color: 'black' },
+  { n: 4, r: (107.5/2 + 91.5/2) / 2, color: 'black' },
+  { n: 3, r: (123.5/2 + 107.5/2) / 2, color: 'black' },
+  { n: 2, r: (139.5/2 + 123.5/2) / 2, color: 'black' },
+  { n: 1, r: (155.5/2 + 139.5/2) / 2, color: 'black' },
 ];
 
-// [dx, dy, textAnchor, dominantBaseline]
+// [dx, dy]; direction only changes the sign of the coordinate offset
 const LABEL_DIRS = [
-  [0, -1, 'middle',  'auto'   ],  // top
-  [0,  1, 'middle',  'hanging'],  // bottom
-  [-1, 0, 'end',     'middle' ],  // left
-  [1,  0, 'start',   'middle' ],  // right
+  [0, -1],  // top
+  [0,  1],  // bottom
+  [-1, 0],  // left
+  [1,  0],  // right
 ] as const;
 ```
 
