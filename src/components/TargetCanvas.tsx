@@ -212,7 +212,7 @@ export default function TargetCanvas({
         <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
 
         {/* 2. Black zone: solid black circle up to ring-7 boundary (scaled for zoom) */}
-        <circle cx={CENTER} cy={CENTER} r={RING_D[7] / 2 * ZOOM_SCALE} fill={isZoom7 ? 'none' : 'black'} />
+        <circle cx={CENTER} cy={CENTER} r={RING_D[7] / 2 * ZOOM_SCALE} fill="black" />
 
         {/* 3. Ring boundary lines (radii scaled by ZOOM_SCALE) */}
         {isZoom7 ? (

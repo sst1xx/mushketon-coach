@@ -23,7 +23,6 @@ interface Props {
 
 // Zoom modes in cyclical order — extend here to add intermediate zoom levels
 const ZOOM_MODES: Array<'full' | 'zoom7'> = ['full', 'zoom7'];
-const ZOOM_LABELS: Record<string, string> = { full: '1-10', zoom7: '7-10' };
 
 export default function TrainingScreen({ athlete, training, epoch, onBack }: Props) {
   const [shots, setShots] = useState<ShotRecord[]>([]);
@@ -149,7 +148,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
         <span style={s.athleteName}>{athlete.name}</span>
         <span style={s.shotNum}>№{shotNumber}</span>
         <button style={s.zoomToggle} onClick={toggleZoom}>
-          {ZOOM_LABELS[zoomMode]}
+          Масштаб
         </button>
       </div>
 
