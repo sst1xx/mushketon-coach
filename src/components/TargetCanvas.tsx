@@ -273,13 +273,13 @@ export default function TargetCanvas({
           const rInner = isDragging || isLast ? 4.55 : 3.64;
           const rOuter = isDragging || isLast ? 5.20 : 4.29;
           const fontSize = isDragging || isLast ? 3.64 : 3.12;
-          const fillColor = isDragging ? '#FF6B00' : isLast ? '#FFD700' : 'white';
-          const strokeColor = isDragging || isLast ? 'white' : 'black';
-          const textFill = isDragging ? 'white' : '#333';
+          const fillColor = isDragging || isLast ? '#22C55E' : 'black';
+          const strokeColor = 'white';
+          const textFill = 'white';
 
           return (
             <g key={shot.id}>
-              <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="black" strokeWidth={0.6} />
+              <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="white" strokeWidth={0.6} />
               <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
               <text
                 x={sp.px} y={sp.py}
