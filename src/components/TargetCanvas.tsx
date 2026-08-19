@@ -237,15 +237,24 @@ export default function TargetCanvas({
           const isDragging = dragging !== null && dragging.shotId === shot.id;
 
           if (isDragging) {
-              // Dragging shot: large, highlighted with distinct fill
-            return <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.5} fill="red" stroke="white" strokeWidth={0.3} />;
-            }
+                // Double stroke for max visibility: outer black, inner orange
+            return <>
+                <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={1.8} fill="none" stroke="black" strokeWidth={0.6} />
+                <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.8} fill="#FF6B00" stroke="white" strokeWidth={0.3} />
+              </>;
+           }
           if (isLast) {
-              // Last committed shot: medium, different color
-            return <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.0} fill="#e74c3c" stroke="white" strokeWidth={0.2} />;
-            }
-            // Other shots: small, semi-transparent
-          return <circle key={shot.id} cx={sp.px} cy={sp.py} r={0.7} fill="rgba(30,30,30,0.5)" />;
+                // Double stroke for max visibility: outer black, inner gold
+            return <>
+                <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={1.2} fill="none" stroke="black" strokeWidth={0.5} />
+                <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.2} fill="#FFD700" stroke="white" strokeWidth={0.25} />
+              </>;
+           }
+              // Double stroke for max visibility: outer black, inner white
+          return <>
+                <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={0.9} fill="none" stroke="black" strokeWidth={0.4} />
+                <circle key={shot.id} cx={sp.px} cy={sp.py} r={0.9} fill="white" stroke="black" strokeWidth={0.2} />
+              </>;
           })}
         </svg>
       </div>
