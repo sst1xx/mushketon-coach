@@ -4,3 +4,4 @@
 # lock-файл скиллов
 skills-lock.json
 node_modules/
+dist/
