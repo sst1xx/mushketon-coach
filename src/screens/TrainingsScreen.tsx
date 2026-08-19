@@ -29,16 +29,16 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
     if (active) { setConfirmNewWithActive(true); return; }
     const db = await openDB();
     const ep = await readEpoch(db);
-    await createTraining(athlete.id, ep);
-    await load();
+    const newTraining = await createTraining(athlete.id, ep);
+    onSelectTraining(newTraining);
    };
 
   const handleNewConfirmed = async () => {
     const db = await openDB();
     const ep = await readEpoch(db);
-    await createTraining(athlete.id, ep);
+    const newTraining = await createTraining(athlete.id, ep);
     setConfirmNewWithActive(false);
-    await load();
+    onSelectTraining(newTraining);
    };
 
   const handleResume = async (t: TrainingRecord) => {
