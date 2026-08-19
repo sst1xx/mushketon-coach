@@ -7,8 +7,13 @@ import { AthleteRecord, TrainingRecord } from './db/schema';
 import AthletesScreen from './screens/AthletesScreen';
 import TrainingsScreen from './screens/TrainingsScreen';
 import TrainingScreen from './screens/TrainingScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
-type Screen = { name: 'athletes' } | { name: 'trainings'; athlete: AthleteRecord } | { name: 'training'; athlete: AthleteRecord; training: TrainingRecord };
+type Screen = 
+  | { name: 'athletes' }
+  | { name: 'trainings'; athlete: AthleteRecord }
+  | { name: 'training'; athlete: AthleteRecord; training: TrainingRecord }
+  | { name: 'settings' };
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -39,7 +44,13 @@ export default function App() {
       <AthletesScreen
         epoch={epoch}
         onSelectAthlete={(athlete) => setScreen({ name: 'trainings', athlete })}
+        onOpenSettings={() => setScreen({ name: 'settings' })}
       />
+    );
+  }
+  if (screen.name === 'settings') {
+    return (
+      <SettingsScreen onBack={() => setScreen({ name: 'athletes' })} />
     );
   }
   if (screen.name === 'trainings') {
