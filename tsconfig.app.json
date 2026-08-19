@@ -10,5 +10,5 @@
      "skipLibCheck": true
    },
    "include": ["src"],
-   "exclude": ["src/db", "src/domain"]
+   "exclude": ["src/db", "src/domain", "src/sw.ts"]
 }
