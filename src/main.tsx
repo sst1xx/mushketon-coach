@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Workbox } from 'workbox-window';
 import App from './App';
 import UpdateBanner from './components/UpdateBanner';
+import './index.css';
 
 // Browser support check — IndexedDB + ServiceWorker required
 function isBrowserSupported(): boolean {
