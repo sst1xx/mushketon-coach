@@ -34,6 +34,9 @@ const RING_LABELS_ZOOM7 = [
   { n: 7,  r: RING_D[7]  / 2 + 2.5, color: 'white' as const },
 ];
 
+const LABEL_FONT_FULL = 3.5;
+const LABEL_FONT_ZOOM7 = 5;
+
 // Label directions: [dx, dy, textAnchor, dominantBaseline]
 const LABEL_DIRS: Array<[number, number, string, string]> = [
   [0, -1, 'middle', 'auto'],
@@ -175,10 +178,12 @@ export default function TargetCanvas({
     return candidates.reduce((a, b) => a.shotNumber > b.shotNumber ? a : b);
   })();
 
-  // Label radii scaled for zoom
+  // Keep labels inside the SVG viewBox in both display modes.
+  const labelFont = isZoom7 ? LABEL_FONT_ZOOM7 : LABEL_FONT_FULL;
+  const maxLabelR = CENTER - labelFont;
   const ringLabels = isZoom7
-    ? RING_LABELS_ZOOM7.map(l => ({ ...l, r: l.r * ZOOM_SCALE }))
-    : RING_LABELS_FULL;
+    ? RING_LABELS_ZOOM7.map(l => ({ ...l, r: Math.min(l.r * ZOOM_SCALE, maxLabelR) }))
+    : RING_LABELS_FULL.map(l => ({ ...l, r: Math.min(l.r, maxLabelR) }));
 
   return (
     <div
@@ -250,12 +255,12 @@ export default function TargetCanvas({
               key={`${n}-${dx}-${dy}`}
               x={CENTER + dx * r}
               y={CENTER + dy * r}
-              fontSize={7 / ZOOM_SCALE}
+              fontSize={labelFont}
               fill={color}
               textAnchor={anchor}
               dominantBaseline={baseline}
               style={{ userSelect: 'none', pointerEvents: 'none' }}
-            >{n - 1}</text>
+            >{n}</text>
           ))
         )}
 
