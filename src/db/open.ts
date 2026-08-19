@@ -13,7 +13,7 @@ export async function openDB(): Promise<IDBDatabase> {
   _db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
-      upgrade(e.target!.result, e.oldVersion);
+      upgrade((e.target as IDBRequest).result as IDBDatabase, e.oldVersion);
     };
     req.onsuccess = () => { attach(req.result); resolve(req.result); };
     req.onerror = () => reject(req.error);
