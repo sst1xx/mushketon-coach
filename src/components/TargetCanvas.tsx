@@ -18,6 +18,36 @@ const RING_D: Record<number, number> = {
 // boundary and the next inner boundary. No ring 10 label is rendered.
 const ZOOM7_SCALE = 80 / (RING_D[7] / 2);
 
+// Shot markers keep their current screen size in zoom7; in full mode they are
+// scaled down proportionally so they don't dominate the small rings.
+const MARKER_SCALE = {
+  full: (RING_D[7] / 2) / 80,
+  zoom7: 1,
+} as const;
+
+// Base marker dimensions (emphasis = last shot or the one being dragged).
+const MARKER_DIMS = {
+  emphasis: { rInner: 4.55, rOuter: 5.2, fontSize: 3.64 },
+  regular: { rInner: 3.64, rOuter: 4.29, fontSize: 3.12 },
+} as const;
+
+export type ZoomMode = 'full' | 'zoom7';
+
+/** Pure helper mirroring computeRingLabels: marker geometry per zoom mode. */
+export function getShotMarkerDims(
+  zoomMode: ZoomMode,
+  emphasis: boolean,
+): { rInner: number; rOuter: number; fontSize: number } {
+  const scale = MARKER_SCALE[zoomMode];
+  const base = emphasis ? MARKER_DIMS.emphasis : MARKER_DIMS.regular;
+  const dims = {
+    rInner: base.rInner * scale,
+    rOuter: base.rOuter * scale,
+    fontSize: base.fontSize * scale,
+  };
+  return dims;
+}
+
 type LabelEntry = { n: number; r: number; color: 'white' | 'black' };
 
 export function computeRingLabels(zoomMode: 'full' | 'zoom7'): LabelEntry[] {
@@ -268,11 +298,10 @@ export default function TargetCanvas({
 
           const isLast = lastShot !== null && shot.id === lastShot.id;
           const isDragging = dragging !== null && dragging.shotId === shot.id;
+          const emphasis = isDragging || isLast;
 
-          const rInner = isDragging || isLast ? 4.55 : 3.64;
-          const rOuter = isDragging || isLast ? 5.20 : 4.29;
-          const fontSize = isDragging || isLast ? 3.64 : 3.12;
-          const fillColor = isDragging || isLast ? '#22C55E' : 'black';
+          const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
+          const fillColor = emphasis ? '#22C55E' : 'black';
           const strokeColor = 'white';
           const textFill = 'white';
 

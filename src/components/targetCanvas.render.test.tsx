@@ -8,8 +8,29 @@ const noop = () => undefined;
 type Props = React.ComponentProps<typeof TargetCanvas>;
 
 function renderMarkup(zoomMode: 'full' | 'zoom7'): string {
+  return renderMarkupWithShots(zoomMode, []);
+}
+
+/** Render with a single committed shot so a shot marker is present. */
+function renderMarkupWithShot(zoomMode: 'full' | 'zoom7'): string {
   const props: Props = {
-    shots: [],
+    shots: [{
+      id: 's1', trainingId: 't1', shotNumber: 1, x: 0, y: 0, score: 105,
+      status: 'committed', createdAt: '', updatedAt: '',
+    }],
+    dragging: null,
+    zoomMode,
+    onDragStart: noop,
+    onDragMove: noop,
+    onDragEnd: noop,
+    onDragCancel: noop,
+  };
+  return renderToStaticMarkup(<TargetCanvas {...props} />);
+}
+
+function renderMarkupWithShots(zoomMode: 'full' | 'zoom7', shots: Props['shots']): string {
+  const props: Props = {
+    shots,
     dragging: null,
     zoomMode,
     onDragStart: noop,
@@ -41,6 +62,61 @@ function extractTexts(markup: string): TextTag[] {
   }
   return tags;
 }
+
+interface CircleTag {
+  attrs: Record<string, string>;
+}
+
+/** Extract all <circle> elements as attribute maps. */
+function extractCircles(markup: string): CircleTag[] {
+  const tags: CircleTag[] = [];
+  const re = /<circle\b([^>]*?)\/?\s*>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markup)) !== null) {
+    const attrs: Record<string, string> = {};
+    const attrRe = /(\S+?)="([^"]*)"/g;
+    let am: RegExpExecArray | null;
+    while ((am = attrRe.exec(m[1])) !== null) {
+      attrs[am[1]] = am[2];
+    }
+    tags.push({ attrs });
+  }
+  return tags;
+}
+
+/** Shot-marker outer ring is the unique circle with strokeWidth 0.6. */
+function markerOuterCircles(circles: CircleTag[]): CircleTag[] {
+  return circles.filter(c => c.attrs['stroke-width'] === '0.6');
+}
+
+// Full-mode marker scale factor (inverse of zoom7 scale).
+const FULL_MARKER_SCALE = 29.75 / 80; // (RING_D[7]/2) / 80
+
+describe('TargetCanvas shot marker size — full mode (render)', () => {
+  const circles = markerOuterCircles(extractCircles(renderMarkupWithShot('full')));
+
+  it('renders exactly one shot marker outer circle', () => {
+    expect(circles).toHaveLength(1);
+  });
+
+  it('marker radius is scaled down for full mode', () => {
+    // Emphasis marker (last & only shot): r = 5.2 * full scale ≈ 1.93
+    expect(Number(circles[0].attrs.r)).toBeCloseTo(5.2 * FULL_MARKER_SCALE, 2);
+    expect(Number(circles[0].attrs.r)).toBeLessThan(5);
+  });
+});
+
+describe('TargetCanvas shot marker — zoom7 mode (render)', () => {
+  const circles = markerOuterCircles(extractCircles(renderMarkupWithShot('zoom7')));
+
+  it('renders exactly one shot marker outer circle', () => {
+    expect(circles).toHaveLength(1);
+  });
+
+  it('marker keeps the current emphasis radius in zoom7', () => {
+    expect(Number(circles[0].attrs.r)).toBeCloseTo(5.2, 2);
+  });
+});
 
 describe('TargetCanvas ring labels — full mode (render)', () => {
   const texts = extractTexts(renderMarkup('full'));
