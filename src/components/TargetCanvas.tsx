@@ -250,7 +250,7 @@ export default function TargetCanvas({
               key={`${n}-${dx}-${dy}`}
               x={CENTER + dx * r}
               y={CENTER + dy * r}
-              fontSize={3.5}
+              fontSize={7}
               fill={color}
               textAnchor={anchor}
               dominantBaseline={baseline}
@@ -270,9 +270,9 @@ export default function TargetCanvas({
           const isLast = lastShot !== null && shot.id === lastShot.id;
           const isDragging = dragging !== null && dragging.shotId === shot.id;
 
-          const rInner = isDragging || isLast ? 3.5 : 2.8;
-          const rOuter = isDragging || isLast ? 4.0 : 3.3;
-          const fontSize = isDragging || isLast ? 2.8 : 2.4;
+          const rInner = isDragging || isLast ? 4.55 : 3.64;
+          const rOuter = isDragging || isLast ? 5.20 : 4.29;
+          const fontSize = isDragging || isLast ? 3.64 : 3.12;
           const fillColor = isDragging ? '#FF6B00' : isLast ? '#FFD700' : 'white';
           const strokeColor = isDragging || isLast ? 'white' : 'black';
           const textFill = isDragging ? 'white' : '#333';
