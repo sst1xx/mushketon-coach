@@ -34,7 +34,7 @@ export interface ShotRecord {
   updatedAt: string;
 }
 
-export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt';
+export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt' | 'targetZoomMode';
 
 export interface SettingsRecord {
   key: SettingsKey;

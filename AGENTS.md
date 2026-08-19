@@ -150,6 +150,32 @@ Deployment: Cloudflare Pages, output dir `dist`.
 2. `CHANGES-TARGET-VISUAL.md` — exact ISSF target geometry and colors.
 3. `CLOUDFLARE-FREE-CONSTRAINTS.md` — hosting limits.
 
+## 13. Development workflow: Planning-first
+
+**RULE: All new features must go through planning phase unless explicitly skipped by the user.**
+
+When a user requests new functionality:
+
+1. **Create a plan first** (`PLAN-<feature-name>.md`) covering:
+   - Functional description and user scenarios
+   - Technical decisions and file changes
+   - Testing strategy (auto + manual)
+   - Acceptance criteria
+   - Rollback plan if needed
+
+2. **Discuss the plan** with the user, iterate if needed
+
+3. **Only after approval**, delegate to worker/implementer with:
+   - Clean context (`context: fresh`)
+   - Reference to the plan document
+   - Clear acceptance criteria
+
+**Exceptions:** User explicitly says "skip planning" / "just do it" / "no plan needed".
+
+**Why:** Prevents rework, documents decisions, keeps codebase consistent with architecture.
+
+**Plan template:** See `PLAN-TARGET-ZOOM.md` as reference.
+
 ## Current Status
 
 **Implemented**

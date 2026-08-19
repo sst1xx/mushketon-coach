@@ -28,4 +28,6 @@ export async function initSettings(db: IDBDatabase): Promise<void> {
   if (sv === null) await setSetting(db, 'SCORING_VERSION', SCORING_VERSION);
    const ep = await getSetting(db, 'dataEpoch');
   if (ep === null) await setSetting(db, 'dataEpoch', 1);
+   const zm = await getSetting(db, 'targetZoomMode');
+  if (zm === null) await setSetting(db, 'targetZoomMode', 'full');
 }
