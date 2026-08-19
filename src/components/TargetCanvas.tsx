@@ -260,7 +260,7 @@ export default function TargetCanvas({
               textAnchor={anchor}
               dominantBaseline={baseline}
               style={{ userSelect: 'none', pointerEvents: 'none' }}
-            >{n}</text>
+            >{n - 1}</text>
           ))
         )}
 

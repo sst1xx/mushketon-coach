@@ -1,6 +1,6 @@
 # AGENTS.md — orientation for LLMs
 
-Short context file. Read this first, then `PLAN.md` for details.
+Short context file. Read this first, then `plans/PLAN.md` for details.
 
 ## 1. What this is
 
@@ -77,7 +77,7 @@ UI layer  Domain layer  Persistence (IndexedDB)
 - Deletion is allowed **with confirmation**.
 - Do not add cloud database, accounts or backend without a separate explicit decision.
 
-## 6. MVP scope (PLAN.md §26)
+## 6. MVP scope (plans/PLAN.md §26)
 
 Athlete list/creation, fast athlete switching, training create/open/continue, N-shot sequence,
 interactive target, tap-to-create, drag positioning, live score, re-editing of last and older
@@ -86,7 +86,7 @@ confirmation, local storage, offline, full backup, restore, PWA, free Cloudflare
 deployment, "Анализ — в разработке" stub, undo of last created shot, persistent-storage request
 and backup reminder.
 
-## 7. Explicitly NOT in MVP (PLAN.md §27)
+## 7. Explicitly NOT in MVP (plans/PLAN.md §27)
 
 Training analysis, progress charts, group analysis, coach comments, sighting/match series,
 cross-device sync, accounts, cloud DB, electronic target integration, camera recognition,
@@ -95,7 +95,8 @@ automatic result import, competitions, export of a single training.
 ## 8. Repository layout
 
 ```
-PLAN.md                       full spec (source of truth, RU, ~1500 lines)
+plans/PLAN.md                 full spec (source of truth, RU, ~1500 lines)
+plans/PLAN-*.md               feature implementation plans
 CHANGES-TARGET-VISUAL.md      spec for correct ISSF target rendering
 CLOUDFLARE-FREE-CONSTRAINTS.md  free-tier limit analysis (conclusion: no blockers)
 index.html                    app entry
@@ -145,18 +146,20 @@ Deployment: Cloudflare Pages, output dir `dist`.
 
 ## 12. Documents to read for depth
 
-1. `PLAN.md` — full functional and technical spec (domain model, gesture model, scoring §14,
+1. `plans/PLAN.md` — full functional and technical spec (domain model, gesture model, scoring §14,
    backup §16–17, storage §19, MVP §26–27, implementation order §28).
 2. `CHANGES-TARGET-VISUAL.md` — exact ISSF target geometry and colors.
 3. `CLOUDFLARE-FREE-CONSTRAINTS.md` — hosting limits.
 
 ## 13. Development workflow: Planning-first
 
-**RULE: All new features must go through planning phase unless explicitly skipped by the user.**
+**RULE: Before every large implementation, creating and approving a plan is mandatory unless the user explicitly skips planning.**
+
+Large implementation means a feature or a change affecting multiple files, layers, or user scenarios.
 
 When a user requests new functionality:
 
-1. **Create a plan first** (`PLAN-<feature-name>.md`) covering:
+1. **Create a plan first** (`plans/PLAN-<feature-name>.md`) covering:
    - Functional description and user scenarios
    - Technical decisions and file changes
    - Testing strategy (auto + manual)
@@ -165,16 +168,34 @@ When a user requests new functionality:
 
 2. **Discuss the plan** with the user, iterate if needed
 
-3. **Only after approval**, delegate to worker/implementer with:
+3. **Only after approval**, split the implementation into small, independently verifiable tasks and delegate them to subagents. Each handoff must include:
    - Clean context (`context: fresh`)
    - Reference to the plan document
-   - Clear acceptance criteria
+   - One focused task with clear boundaries
+   - Clear acceptance criteria and verification command(s)
+
+### 13.1 Working with subagents
+
+- Before delegating, always select the most appropriate enabled subagent from the available
+  subagents for the task. Do not use a generic agent when a specialized agent is better suited.
+- `worker` is the **primary working model** for implementation work: code changes, related
+  tests/builds, and deployments.
+- All code changes, tests/builds related to those changes, and every deployment must be performed
+  through `worker`; the coordinator does not implement or deploy directly.
+- The coordinator is responsible for clarifying requirements, creating and discussing plans,
+  delegating to `worker`, and reviewing/reporting its result.
+- Break large work into small, independently verifiable tasks before delegation. Give each `worker`
+  handoff one focused task, relevant repository constraints, and explicit verification and acceptance
+  criteria. Use `context: fresh` for implementation and deployment handoffs.
+- Keep one `worker` writer in the shared working directory at a time. Parallel work that changes
+  files requires isolated worktrees and a deliberate integration step.
+- Deployment remains subject to the user's explicit request and all repository safety rules.
 
 **Exceptions:** User explicitly says "skip planning" / "just do it" / "no plan needed".
 
 **Why:** Prevents rework, documents decisions, keeps codebase consistent with architecture.
 
-**Plan template:** See `PLAN-TARGET-ZOOM.md` as reference.
+**Plan template:** See `plans/PLAN-TARGET-ZOOM.md` as reference.
 
 ## Current Status
 
@@ -195,7 +216,7 @@ When a user requests new functionality:
   commits; verify against the spec before further changes).
 
 **Not implemented**
-- Fast athlete switcher inside the training screen (PLAN §6 dropdown); switching currently
+- Fast athlete switcher inside the training screen (`plans/PLAN.md` §6 dropdown); switching currently
   requires navigating back to the athletes list.
 - Training analysis and everything listed in §7 above.
 
