@@ -250,7 +250,7 @@ export default function TargetCanvas({
               key={`${n}-${dx}-${dy}`}
               x={CENTER + dx * r}
               y={CENTER + dy * r}
-              fontSize={7}
+              fontSize={7 / ZOOM_SCALE}
               fill={color}
               textAnchor={anchor}
               dominantBaseline={baseline}
