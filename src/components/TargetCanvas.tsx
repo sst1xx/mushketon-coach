@@ -270,25 +270,28 @@ export default function TargetCanvas({
           const isLast = lastShot !== null && shot.id === lastShot.id;
           const isDragging = dragging !== null && dragging.shotId === shot.id;
 
-          if (isDragging) {
-            // Double stroke for max visibility: outer black, inner orange
-            return <>
-              <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={1.8} fill="none" stroke="black" strokeWidth={0.6} />
-              <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.8} fill="#FF6B00" stroke="white" strokeWidth={0.3} />
-            </>;
-          }
-          if (isLast) {
-            // Double stroke for max visibility: outer black, inner gold
-            return <>
-              <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={1.2} fill="none" stroke="black" strokeWidth={0.5} />
-              <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.2} fill="#FFD700" stroke="white" strokeWidth={0.25} />
-            </>;
-          }
-          // Double stroke for max visibility: outer black, inner white
-          return <>
-            <circle key={shot.id + '-outer'} cx={sp.px} cy={sp.py} r={0.9} fill="none" stroke="black" strokeWidth={0.4} />
-            <circle key={shot.id} cx={sp.px} cy={sp.py} r={0.9} fill="white" stroke="black" strokeWidth={0.2} />
-          </>;
+          const rInner = isDragging || isLast ? 3.5 : 2.8;
+          const rOuter = isDragging || isLast ? 4.0 : 3.3;
+          const fontSize = isDragging || isLast ? 2.8 : 2.4;
+          const fillColor = isDragging ? '#FF6B00' : isLast ? '#FFD700' : 'white';
+          const strokeColor = isDragging || isLast ? 'white' : 'black';
+          const textFill = isDragging ? 'white' : '#333';
+
+          return (
+            <g key={shot.id}>
+              <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="black" strokeWidth={0.6} />
+              <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
+              <text
+                x={sp.px} y={sp.py}
+                fontSize={fontSize}
+                fill={textFill}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontWeight="bold"
+                style={{ userSelect: 'none', pointerEvents: 'none' }}
+              >{shot.shotNumber}</text>
+            </g>
+          );
         })}
       </svg>
     </div>
