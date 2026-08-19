@@ -7,18 +7,32 @@ const CENTER = VIEW / 2; // 80
 const SVG_TARGET_RECT = { left: 0, top: 0, width: VIEW, height: VIEW };
 const HIT_RADIUS_PX = 24;
 
-// Ring diameters (mm), ring 1 (outermost, largest) to ring 10 (innermost)
-const RING_DIAMETERS = [
-    155.5, // ring 1
-    139.5, // ring 2
-    123.5, // ring 3
-    107.5, // ring 4
-     91.5, // ring 5
-     75.5, // ring 6
-     59.5, // ring 7
-     43.5, // ring 8
-     27.5, // ring 9
-     11.5, // ring 10
+// Ring boundary diameters (mm)
+const RING_D: Record<number, number> = {
+ 1: 155.5, 2: 139.5, 3: 123.5, 4: 107.5,
+ 5: 91.5,  6: 75.5,  7: 59.5,  8: 43.5,
+ 9: 27.5, 10: 11.5,
+};
+
+// Ring labels: ring number, label radius (mm from center), text color
+const RING_LABELS = [
+  { n: 9, r: RING_D[9]   / 2 + 2.5, color: 'white' },
+  { n: 8, r: RING_D[8]   / 2 + 2.5, color: 'white' },
+  { n: 7, r: RING_D[7]   / 2 + 2.5, color: 'white' },
+  { n: 6, r: RING_D[6]   / 2 + 2.5, color: 'black' },
+  { n: 5, r: RING_D[5]   / 2 + 2.5, color: 'black' },
+  { n: 4, r: RING_D[4]   / 2 + 2.5, color: 'black' },
+  { n: 3, r: RING_D[3]   / 2 + 2.5, color: 'black' },
+  { n: 2, r: RING_D[2]   / 2 + 2.5, color: 'black' },
+  { n: 1, r: RING_D[1]   / 2 + 2.5, color: 'black' },
+];
+
+// Label directions: [dx, dy, textAnchor, dominantBaseline]
+const LABEL_DIRS: Array<[number, number, string, string]> = [
+ [0, -1, 'middle', 'auto'],
+ [0,  1, 'middle', 'hanging'],
+ [-1, 0, 'end',    'middle'],
+ [1,  0, 'start',  'middle'],
 ];
 
 interface Props {
@@ -42,109 +56,109 @@ export default function TargetCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(0);
 
-  // ResizeObserver to determine the square size that fits the container
+   // ResizeObserver to determine the square size that fits the container
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect;
       setSize(Math.min(width, height));
-    });
+     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+   }, []);
 
-   // Convert a pointer event's position to xh/yh target coords
+    // Convert a pointer event's position to xh/yh target coords
   const pointerToTarget = useCallback((clientX: number, clientY: number) => {
     const el = svgRef.current;
     if (!el) return null;
     const rect = el.getBoundingClientRect();
     return screenToTarget(clientX, clientY, rect);
-   }, []);
+    }, []);
 
-   // Determine which shot (if any) is within hit radius, preferring nearest then highest shotNumber
+    // Determine which shot (if any) is within hit radius, preferring nearest then highest shotNumber
   const findNearestShot = useCallback((clientX: number, clientY: number): ShotRecord | null => {
     const el = svgRef.current;
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-      // Convert to SVG user coordinates
+       // Convert to SVG user coordinates
     const svgX = (clientX - rect.left) * VIEW / rect.width;
     const svgY = (clientY - rect.top) * VIEW / rect.height;
-      // Convert mm to px for distance comparison
+       // Convert mm to px for distance comparison
     const pxPerMm = rect.width / VIEW;
     let best: ShotRecord | null = null;
     let bestDist = Infinity;
     for (const shot of shots) {
-       // Use the dragging target for the shot being dragged
+        // Use the dragging target for the shot being dragged
       let shotXh = shot.x;
       let shotYh = shot.y;
       if (dragging && dragging.shotId === shot.id) {
         shotXh = dragging.xh;
         shotYh = dragging.yh;
-      }
+       }
       const sp = targetToScreen(shotXh, shotYh, SVG_TARGET_RECT);
       const dx = sp.px - svgX;
       const dy = sp.py - svgY;
       const distPx = Math.sqrt(dx * dx + dy * dy) * pxPerMm;
       if (distPx <= HIT_RADIUS_PX) {
         if (distPx < bestDist ||
-           (distPx === bestDist && best !== null && shot.shotNumber > best.shotNumber)) {
+            (distPx === bestDist && best !== null && shot.shotNumber > best.shotNumber)) {
           bestDist = distPx;
           best = shot;
-         }
-       }
-     }
+          }
+        }
+      }
     return best;
-   }, [shots, dragging]);
+    }, [shots, dragging]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-      // Only handle first active pointer
+       // Only handle first active pointer
     if (dragging) return;
     const target = pointerToTarget(e.clientX, e.clientY);
     if (!target) return; // outside target circle
     const nearest = findNearestShot(e.clientX, e.clientY);
     if (nearest) {
       onDragStart(nearest.id, nearest.x, nearest.y, true);
-     } else {
+      } else {
       onDragStart(null, target.xh, target.yh, false);
-     }
+      }
     e.currentTarget.setPointerCapture(e.pointerId);
-   }, [dragging, pointerToTarget, findNearestShot, onDragStart]);
+    }, [dragging, pointerToTarget, findNearestShot, onDragStart]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging) return;
     const target = pointerToTarget(e.clientX, e.clientY);
     if (!target) return; // outside target — stay at last valid
     onDragMove(target.xh, target.yh);
-   }, [dragging, pointerToTarget, onDragMove]);
+    }, [dragging, pointerToTarget, onDragMove]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (!dragging) return;
     const target = pointerToTarget(e.clientX, e.clientY);
     if (target) {
       onDragEnd(target.xh, target.yh);
-     } else {
+      } else {
       onDragEnd(dragging.xh, dragging.yh);
-     }
+      }
     e.currentTarget.releasePointerCapture(e.pointerId);
-   }, [dragging, pointerToTarget, onDragEnd]);
+    }, [dragging, pointerToTarget, onDragEnd]);
 
   const handlePointerCancel = useCallback(() => {
     if (!dragging) return;
     onDragCancel();
-   }, [dragging, onDragCancel]);
+    }, [dragging, onDragCancel]);
 
-   // Find last shot (highest shotNumber among non-dragging shots)
+    // Find last shot (highest shotNumber among non-dragging shots)
   const lastShot = (() => {
     const candidates = dragging
-       ? shots.filter(s => s.id !== dragging.shotId)
-       : shots;
+        ? shots.filter(s => s.id !== dragging.shotId)
+        : shots;
     if (candidates.length === 0) return null;
     return candidates.reduce((a, b) => a.shotNumber > b.shotNumber ? a : b);
-  })();
+   })();
 
   return (
-     <div
+      <div
       ref={containerRef}
       style={{
         flex: 1,
@@ -154,9 +168,9 @@ export default function TargetCanvas({
         alignItems: 'center',
         justifyContent: 'center',
         touchAction: 'none',
-      }}
-     >
-       <svg
+       }}
+      >
+        <svg
         ref={svgRef}
         viewBox={`0 0 ${VIEW} ${VIEW}`}
         style={{
@@ -165,33 +179,56 @@ export default function TargetCanvas({
           maxWidth: '100%',
           maxHeight: '100%',
           touchAction: 'none',
-        }}
+         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-       >
-         {/* Rings from outside in */}
-         {RING_DIAMETERS.map((d, i) => {
-          const r = d / 2;
-          const ringNum = i + 1;
-           // Ring 10 is black, alternating: even index = white, odd index = black
-          const fill = i % 2 === 1 ? 'white' : 'black';
-          return (
-             <circle
-              key={ringNum}
-              cx={CENTER}
-              cy={CENTER}
-              r={r}
-              fill={fill}
-              strokeWidth={ringNum < RING_DIAMETERS.length ? 0.1 : undefined}
-             />
-           );
-         })}
+        >
+          {/* 1. White background */}
+          <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
 
-         {/* Shot markers */}
-         {shots.map(shot => {
-           // Use dragging position if this is the shot being dragged
+          {/* 2. Black zone: solid black circle up to ring-7 boundary */}
+          <circle cx={CENTER} cy={CENTER} r={RING_D[7] / 2} fill="black" />
+
+          {/* 3. Ring boundary lines for outer white rings (1–6): black stroke */}
+          {([1, 2, 3, 4, 5, 6] as const).map(n => (
+            <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
+             fill="none" stroke="#333" strokeWidth={0.3} />
+          ))}
+
+          {/* 4. Ring boundary lines inside black zone (8, 9): white stroke */}
+          {([8, 9] as const).map(n => (
+            <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
+             fill="none" stroke="white" strokeWidth={0.3} />
+          ))}
+
+          {/* 5. Ring 10 boundary line: white stroke */}
+          <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2}
+           fill="none" stroke="white" strokeWidth={0.3} />
+
+          {/* 6. Inner ten white dot (r = 2.5 mm) */}
+          <circle cx={CENTER} cy={CENTER} r={2.5} fill="white" />
+
+          {/* 7. Ring labels 1–9, four directions */}
+          {RING_LABELS.map(({ n, r, color }) =>
+            LABEL_DIRS.map(([dx, dy, anchor, baseline]) => (
+              <text
+                key={`${n}-${dx}-${dy}`}
+                x={CENTER + dx * r}
+                y={CENTER + dy * r}
+                fontSize={3.5}
+                fill={color}
+                textAnchor={anchor}
+                dominantBaseline={baseline}
+                style={{ userSelect: 'none', pointerEvents: 'none' }}
+              >{n}</text>
+            ))
+          )}
+
+          {/* Shot markers */}
+          {shots.map(shot => {
+            // Use dragging position if this is the shot being dragged
           const xh = dragging && dragging.shotId === shot.id ? dragging.xh : shot.x;
           const yh = dragging && dragging.shotId === shot.id ? dragging.yh : shot.y;
           const sp = targetToScreen(xh, yh, SVG_TARGET_RECT);
@@ -200,17 +237,17 @@ export default function TargetCanvas({
           const isDragging = dragging !== null && dragging.shotId === shot.id;
 
           if (isDragging) {
-             // Dragging shot: large, highlighted with distinct fill
+              // Dragging shot: large, highlighted with distinct fill
             return <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.5} fill="red" stroke="white" strokeWidth={0.3} />;
-           }
+            }
           if (isLast) {
-             // Last committed shot: medium, different color
+              // Last committed shot: medium, different color
             return <circle key={shot.id} cx={sp.px} cy={sp.py} r={1.0} fill="#e74c3c" stroke="white" strokeWidth={0.2} />;
-           }
-           // Other shots: small, semi-transparent
+            }
+            // Other shots: small, semi-transparent
           return <circle key={shot.id} cx={sp.px} cy={sp.py} r={0.7} fill="rgba(30,30,30,0.5)" />;
-         })}
-       </svg>
-     </div>
-   );
+          })}
+        </svg>
+      </div>
+    );
 }
