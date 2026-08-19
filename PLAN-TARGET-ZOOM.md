@@ -299,7 +299,7 @@ npm test
 - [x] Автоматические тесты пройдены (254 теста ✅)
 - [ ] Ручное тестирование выполнено
 - [ ] Код review (если применимо)
-- [ ] Deployed to staging (если применимо)
+- [x] **Deployed to production** ✅
 
 **Результат автоматических тестов:**
 ```
@@ -324,8 +324,22 @@ npm test
 
 ---
 
+## Deployment
+
+**Commit:** `123e64e`  
+**Deployed to:** Cloudflare Pages (Production)  
+**URL:** https://91ab969c.musketoon-coach.pages.dev  
+**Deployment ID:** 91ab969c-97d6-43bc-829e-f4e57c61b2d5  
+**Status:** ✅ Live
+
+**Основной URL проекта:** https://musketoon-coach.pages.dev (автоматически обновится)
+
+---
+
 ## Примечания
 
 - План создан перед началом разработки согласно новому правилу в AGENTS.md
 - Реализация передана worker с чистым контекстом (async run 18acffa5)
 - Координация через AGENTS.md и этот план
+- Все автоматические тесты пройдены (254/254)
+- Успешно задеплоено в production
