@@ -137,6 +137,17 @@ export async function deleteDraft(id: string, clientEpoch: number): Promise<void
       });
 }
 
+// ─── deleteCommittedShotForUndo ──────────────────────────────────────────────
+
+export async function deleteCommittedShotForUndo(id: string, clientEpoch: number): Promise<void> {
+  const db = await openDB();
+  await withReadWrite(db, ['shots'], clientEpoch, (tx) => new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore('shots').delete(id);
+  }));
+}
+
 // ─── listShots ───────────────────────────────────────────────────────────────
 
 export async function listShots(trainingId: string): Promise<ShotRecord[]> {

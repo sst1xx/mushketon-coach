@@ -3,11 +3,12 @@ import { openDB } from './db/open';
 import { initSettings } from './db/settings';
 import { runStartupCleanup } from './db/startup';
 import { readEpoch } from './db/tx';
-import { AthleteRecord } from './db/schema';
+import { AthleteRecord, TrainingRecord } from './db/schema';
 import AthletesScreen from './screens/AthletesScreen';
 import TrainingsScreen from './screens/TrainingsScreen';
+import TrainingScreen from './screens/TrainingScreen';
 
-type Screen = { name: 'athletes' } | { name: 'trainings'; athlete: AthleteRecord };
+type Screen = { name: 'athletes' } | { name: 'trainings'; athlete: AthleteRecord } | { name: 'training'; athlete: AthleteRecord; training: TrainingRecord };
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -47,6 +48,17 @@ export default function App() {
         athlete={screen.athlete}
         epoch={epoch}
         onBack={() => setScreen({ name: 'athletes' })}
+        onSelectTraining={(training) => setScreen({ name: 'training', athlete: screen.athlete, training })}
+      />
+    );
+  }
+  if (screen.name === 'training') {
+    return (
+      <TrainingScreen
+        athlete={screen.athlete}
+        training={screen.training}
+        epoch={epoch}
+        onBack={() => setScreen({ name: 'trainings', athlete: screen.athlete })}
       />
     );
   }
