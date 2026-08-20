@@ -1,5 +1,5 @@
 /**
- * IndexedDB schema types for mushketon-coach.
+ * IndexedDB schema types for musketoon-coach.
  * All coordinates stored as integer hundredths of mm (xh/yh).
  * Score stored as integer tenths (109..10, 0).
  */
@@ -41,7 +41,7 @@ export interface SettingsRecord {
   value: number | boolean | string | null;
 }
 
-export const DB_NAME = 'mushketon-coach';
+export const DB_NAME = 'musketoon-coach';
 export const DB_VERSION = 1;
 
 export const STORES = {

@@ -79,7 +79,7 @@ describe('IndexedDB persistence layer', () => {
      // fake-indexeddb/auto persists across tests in same process —
     // delete the DB to start fresh every time.
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.deleteDatabase('mushketon-coach');
+      const req = indexedDB.deleteDatabase('musketoon-coach');
        req.onsuccess = () => resolve();
        req.onerror = () => reject(req.error);
         });
