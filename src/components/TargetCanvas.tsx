@@ -65,6 +65,7 @@ export function computeRingLabels(zoomMode: ZoomMode): LabelEntry[] {
 
 const LABEL_FONT_FULL = 3.5;
 const LABEL_FONT_ZOOM7 = 5;
+const LABEL_FONT_ZOOM9 = LABEL_FONT_ZOOM7 * (ZOOM9_SCALE / ZOOM7_SCALE);
 
 // Label directions: all use centered anchors; the direction only changes the
 // sign of the coordinate offset from the target center.
@@ -209,7 +210,7 @@ export default function TargetCanvas({
     return candidates.reduce((a, b) => a.shotNumber > b.shotNumber ? a : b);
   })();
 
-  const labelFont = isZoom7 || isZoom9 ? LABEL_FONT_ZOOM7 : LABEL_FONT_FULL;
+  const labelFont = isZoom7 ? LABEL_FONT_ZOOM7 : isZoom9 ? LABEL_FONT_ZOOM9 : LABEL_FONT_FULL;
   const ringLabels = computeRingLabels(zoomMode);
 
   return (
