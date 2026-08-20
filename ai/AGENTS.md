@@ -113,7 +113,7 @@ Agents (see `.pi/settings.json`), cheapest first: `scout` < `worker` < `reviewer
 | --- | --- |
 | Find files, "where is X", read-only recon | `scout` |
 | Write code, edit files, run tests/build, deploy | `worker` (only agent that edits) |
-| Check worker's result vs task/plan, run tests | `reviewer` (may apply small fixes) |
+| Check worker's result vs task/plan, run tests; review and report only, never edits | `reviewer` (read-only) |
 | Risky design decision, or worker failed twice | `oracle` (advisory, never edits) |
 
 Default pipeline: `scout` → plan → `worker` → `reviewer`.
@@ -125,12 +125,28 @@ Rules:
 - One `worker` writing in the working directory at a time.
 - Every handoff = one focused task + plan reference + acceptance criteria + verification command
   (usually `npx vitest run`).
-- Review after every `worker` code change, unless the user says "skip review" or the change is
-  trivial (docs/comments/formatting).
+- Review is mandatory after every `worker` change — no exceptions for size or triviality
+  (including docs/comments/formatting); `reviewer` only reviews/reports and never edits files.
+- All fixes are implemented by `worker` and then re-reviewed by `reviewer`.
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
 - Rework found by `reviewer` goes back to `worker`.
 - Isolation for parallel `worker` runs is achieved with separate worktrees (see §8); the rule
   "one writer per working directory" still applies within each worktree.
+
+### Mandatory order of operations
+
+- The coordinator **never** edits code and **never** deploys — always delegates, never falls back
+  to doing the work directly.
+- `worker` is the **only** agent that changes code and runs deploys.
+- `reviewer` is **mandatory** after every `worker` change — no exceptions for size or triviality.
+- If `worker` fails (tests/build/deploy): the coordinator does **not** fix it directly. Fix the
+  handoff and/or environment, then re-run `worker` with the same task.
+- Deploy: only `worker` runs it, only after a successful `reviewer` pass, and only with explicit
+  user permission (see §1).
+- Commit: same confirmation rule as deploy — explicit user request first (see §1).
+- Reviewer fixes: `reviewer` only reports findings; it never applies fixes itself. Every fix is
+  done by `worker`, which re-verifies (re-runs tests/build), and then goes through a mandatory
+  re-review by `reviewer`.
 
 ## 8. Worktrees
 
