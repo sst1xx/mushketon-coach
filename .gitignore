@@ -1,8 +1,15 @@
 # все папки, начинающиеся с точки
 .*/
 
+# симлинки на shared/ (worktree layout, см. AGENTS.md)
+.pi
+.claude
+.agents
+.wrangler
+.env
+node_modules
+
 # lock-файл скиллов
 skills-lock.json
-node_modules/
 dist/
 context.md

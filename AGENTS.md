@@ -19,6 +19,8 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 
 ## 2. Commands
 
+All commands run **inside a worktree** (`main/` or `wt-*/`), not in the container root.
+
 ```bash
 npm install
 npm run dev        # Vite dev server
@@ -47,6 +49,24 @@ plans/PLAN.md         full spec, source of truth (RU)
 plans/PLAN-*.md       per-feature plans; use PLAN-TARGET-ZOOM.md as template
 CHANGES-TARGET-VISUAL.md  exact ISSF target geometry and colors
 ```
+
+All paths above (`src/…`, `plans/…`, etc.) are relative to the **current worktree**, e.g.
+`main/src/scoring.ts`. Container layout (see §9 Worktrees):
+
+```
+mushketon-coach/        # container, path never changes — pi runs from here
+├── .bare/               # bare git dir
+├── .git                 # pointer file: "gitdir: ./.bare"
+├── .pi/ .claude/ .agents/               # pi/agent config — root only, never in a worktree
+├── .wrangler/ .env  node_modules/      # build/deploy state — real here, symlinked into worktrees
+├── link-shared.sh       # symlinks .wrangler/.env/node_modules into a worktree
+├── main/                # worktree of branch main — code only + the symlinks above
+└── wt-<feature>/        # feature worktrees, created on demand
+```
+
+pi is started from the container root, so its config (`.pi/`, `.claude/`, `.agents/`) lives there
+only — a worktree must never have its own copy or symlink of it, it should contain code only
+(plus the build/deploy symlinks it needs).
 
 Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fake-indexeddb.
 
@@ -104,8 +124,34 @@ Rules:
   trivial (docs/comments/formatting).
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
 - Rework found by `reviewer` goes back to `worker`.
+- Isolation for parallel `worker` runs is achieved with separate worktrees (see §8); the rule
+  "one writer per working directory" still applies within each worktree.
 
-## 8. Output style
+## 8. Worktrees
+
+Create a feature worktree:
+
+```bash
+cd ~/Downloads/home/mushketon-coach
+git worktree add wt-<feature> -b <feature>
+./link-shared.sh wt-<feature>
+cd wt-<feature> && npx vitest run
+```
+
+Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
+
+Rules:
+- `plans/` and code are versioned per branch, same as before.
+- `.wrangler`, `.env`, `node_modules` live for real at the container root; each worktree gets
+  **symlinks** to them via `link-shared.sh` (needed to build/test/deploy from inside the worktree).
+  Never commit the symlinks, never edit the shared configs "for one branch only".
+- `.pi`, `.claude`, `.agents` stay **only at the container root** — pi/agent config, not needed
+  inside a worktree. Do not symlink or copy them into `main/` or `wt-*/`.
+- If a branch needs different dependencies: remove the `node_modules` symlink and run a local
+  `npm install` in that worktree instead.
+- One `worker` writer per worktree. Parallel tasks → separate worktrees (see §7).
+
+## 9. Output style
 
 - Report only changed blocks (diff with 3–5 lines context), not whole files.
 - For test/build output report the summary line, or the filtered errors if it failed.
