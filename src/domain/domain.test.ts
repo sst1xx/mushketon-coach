@@ -16,6 +16,8 @@ import {
    commitShot,
    updateCoords,
    deleteDraft,
+   deleteCommittedShotForUndo,
+   undoLastShot,
    listShots,
    exportBackup,
    validateBackup,
@@ -158,6 +160,72 @@ describe('shotRepo', () => {
     await commitShot(s2.id, 100, 200, epoch);
     await expect(deleteDraft(s2.id, epoch)).rejects.toThrow(/draft/i);
       });
+
+  it('undo deletes the most recently created shot even after it was moved (create->move->undo)', async () => {
+    const s1 = await createDraft(trainingId, 100, 200, epoch);
+    await commitShot(s1.id, 100, 200, epoch);
+    const s2 = await createDraft(trainingId, 300, 400, epoch);
+    await commitShot(s2.id, 300, 400, epoch);
+
+    // Edit (move) the most recent shot after creation — must not block undo
+    await updateCoords(s2.id, 350, 450, epoch);
+    await deleteCommittedShotForUndo(s2.id, epoch);
+
+    const remaining = await listShots(trainingId);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].shotNumber).toBe(1);
+  });
+
+  it('multiple undo deletes successive last-created shots until none remain', async () => {
+    const created: Array<{ id: string; shotNumber: number }> = [];
+    for (let i = 0; i < 3; i++) {
+      const d = await createDraft(trainingId, 100 + i * 10, 200 + i * 10, epoch);
+      const c = await commitShot(d.id, 100 + i * 10, 200 + i * 10, epoch);
+      created.push({ id: c.id, shotNumber: c.shotNumber });
+    }
+
+    // Undo in reverse order (last created first), until empty
+    for (let i = created.length - 1; i >= 0; i--) {
+      await deleteCommittedShotForUndo(created[i].id, epoch);
+      expect(await listShots(trainingId)).toHaveLength(i);
+    }
+    expect(await listShots(trainingId)).toHaveLength(0);
+  });
+
+  it('undoLastShot: sequential undo works LIFO until the training is empty', async () => {
+    for (let i = 0; i < 3; i++) {
+      const d = await createDraft(trainingId, 100 + i * 10, 200 + i * 10, epoch);
+      await commitShot(d.id, 100 + i * 10, 200 + i * 10, epoch);
+    }
+    expect(await listShots(trainingId)).toHaveLength(3);
+
+    // Each undo removes exactly the most recently created shot
+    expect(await undoLastShot(trainingId, epoch)).toBe(true);
+    expect((await listShots(trainingId)).map((s) => s.shotNumber)).toEqual([1, 2]);
+    expect(await undoLastShot(trainingId, epoch)).toBe(true);
+    expect((await listShots(trainingId)).map((s) => s.shotNumber)).toEqual([1]);
+    expect(await undoLastShot(trainingId, epoch)).toBe(true);
+    expect(await listShots(trainingId)).toHaveLength(0);
+
+    // Empty state: no-op, reports failure
+    expect(await undoLastShot(trainingId, epoch)).toBe(false);
+  });
+
+  it('undoLastShot does not renumber the monotonic nextShotNumber counter', async () => {
+    for (let i = 0; i < 3; i++) {
+      const d = await createDraft(trainingId, 100 + i * 10, 200 + i * 10, epoch);
+      await commitShot(d.id, 100 + i * 10, 200 + i * 10, epoch);
+    }
+    const before = (await getTraining(trainingId))!.nextShotNumber;
+    expect(before).toBe(4);
+
+    // Undo everything
+    while (await undoLastShot(trainingId, epoch)) { /* drain */ }
+    expect(await listShots(trainingId)).toHaveLength(0);
+
+    // Counter is monotonic — never decremented by undo
+    expect((await getTraining(trainingId))!.nextShotNumber).toBe(before);
+  });
 });
 
 // ─── backupService ───────────────────────────────────────────────────────────

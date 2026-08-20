@@ -1,225 +1,112 @@
-# AGENTS.md — orientation for LLMs
+# AGENTS.md — read this first
 
-Short context file. Read this first, then `plans/PLAN.md` for details.
+`mushketon-coach` — offline PWA for a shooting coach (ISSF 10 m air pistol).
+The coach reads a shot position from the electronic target monitor and enters it manually:
+tap on the target → drag to refine → live ISSF decimal score → release commits.
+All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 
-## 1. What this is
+## 1. Hard rules (never break)
 
-`mushketon-coach` — PWA for a shooting coach (ISSF 10 m air pistol).
-During training the coach stands behind the athlete, reads the shot position from the
-electronic target monitor and transfers it manually into the app. The app stores shots,
-computes ISSF decimal score and keeps training history.
+1. NEVER commit unless the user explicitly says "commit" / "закоммить". Ask before committing.
+2. NEVER deploy unless the user explicitly asks.
+3. NEVER install/upgrade packages without explicit user approval.
+4. NEVER add: backend API, user accounts, cloud DB (D1/KV), analytics, CDN/fonts from other
+   origins, `unsafe-inline`/`unsafe-eval` in CSP, new runtime dependencies.
+5. Change only what the task requires. Do not refactor or reformat adjacent code.
+6. Keep scoring/geometry pure: `src/scoring.ts`, `src/transform.ts` must contain no React and no I/O.
+7. Before any large change (multiple files/layers), write a plan in `plans/PLAN-<feature>.md` and
+   get approval — unless the user says "skip planning" / "just do it".
 
-Problem solved: there is no simple, offline, local-only tool for a coach to log and score
-shots of several athletes on a phone.
-
-## 2. Users and usage
-
-- Single user per device: the coach.
-- Primary device: **phone**, tablet is secondary.
-- Primary phone mode: **portrait** (manifest `orientation: portrait`).
-- Used at the shooting range, possibly without internet → offline-first.
-
-## 3. Key user scenario
-
-1. Coach opens the app and **must first pick or create an athlete** (no work without an athlete).
-2. Creates a new training or opens/continues an existing one.
-3. Training = sequence of N shots, **no fixed series size**.
-4. New shot: **tap** on the target → position refined by **drag** → score updates **in real time
-   during drag** → release commits.
-5. The last shot stays editable and can be corrected multiple times; **any older shot can also be
-   edited**.
-6. All hits are drawn on the target; older ones are rendered less prominently.
-7. Undo is available for the last created shot.
-8. Data lives only on the device; the coach makes a **backup file** to avoid data loss.
-
-## 4. Architecture principles
-
-```
-Cloudflare Pages (static hosting only)
-        │
-       PWA
-   ┌────┼──────────────┐
-UI layer  Domain layer  Persistence (IndexedDB)
-              │
-        Target model + ISSF scoring (pure, UI-free)
-```
-
-- **Local-first**: all user data in IndexedDB on the device. Nothing is sent to a server.
-- **Offline-first**: service worker precaches the app shell; update via prompt banner.
-- **Scoring and target geometry are strictly separated from UI** (`src/scoring.ts`,
-  `src/transform.ts` are pure functions, no React).
-- Strict CSP (`public/_headers`): no `unsafe-inline`/`unsafe-eval`, no third-party runtime
-  resources, no CDN/analytics/fonts from other origins.
-- Dependencies pinned, lockfile committed, runtime deps minimal (react, react-dom only).
-
-## 5. Locked decisions (do not change casually)
-
-- App is a **PWA**; phone-first, portrait-first; tablet supported additionally.
-- Athlete and training data are stored **only locally**; the server stores no user data.
-- **Cloudflare is used for hosting only** (Pages, static assets). No D1, no KV, no backend API,
-  no accounts.
-- **IndexedDB** is the local storage engine.
-- **Full backup/restore is mandatory**; a backup is **one file containing all app data**
-  (athletes, trainings, shots, settings) — see `BackupFile` in `src/domain/backupService.ts`.
-- Coach must select/create an athlete before anything else.
-- One coach can run **several athletes at the same time**, with **fast switching** between them;
-  switching must not finish or reset the current training.
-- Training = sequence of N shots without fixed series length; an existing training can be
-  reopened and continued.
-- **Shot number is an event ordinal and is never automatically renumbered**
-  (`TrainingRecord.nextShotNumber` monotonic).
-- All hits are shown on the target, older ones less visible.
-- Shot creation = tap; refinement = drag; score changes live during drag.
-- Last shot remains editable, repeatedly; older shots are editable too.
-- **ISSF decimal scoring 10.0–10.9** (internally integer tenths, coordinates in integer
-  hundredths of mm).
-- **Full analysis is not implemented yet**; UI keeps an "Анализ — в разработке" entry.
-- Deletion is allowed **with confirmation**.
-- Do not add cloud database, accounts or backend without a separate explicit decision.
-
-## 6. MVP scope (plans/PLAN.md §26)
-
-Athlete list/creation, fast athlete switching, training create/open/continue, N-shot sequence,
-interactive target, tap-to-create, drag positioning, live score, re-editing of last and older
-shots, rendering of all previous hits, ISSF decimal scoring, training history, delete with
-confirmation, local storage, offline, full backup, restore, PWA, free Cloudflare Pages
-deployment, "Анализ — в разработке" stub, undo of last created shot, persistent-storage request
-and backup reminder.
-
-## 7. Explicitly NOT in MVP (plans/PLAN.md §27)
-
-Training analysis, progress charts, group analysis, coach comments, sighting/match series,
-cross-device sync, accounts, cloud DB, electronic target integration, camera recognition,
-automatic result import, competitions, export of a single training.
-
-## 8. Repository layout
-
-```
-plans/PLAN.md                 full spec (source of truth, RU, ~1500 lines)
-plans/PLAN-*.md               feature implementation plans
-CHANGES-TARGET-VISUAL.md      spec for correct ISSF target rendering
-CLOUDFLARE-FREE-CONSTRAINTS.md  free-tier limit analysis (conclusion: no blockers)
-index.html                    app entry
-vite.config.ts                Vite + vite-plugin-pwa (injectManifest, prompt update)
-vitest.config.ts              tests (fake-indexeddb)
-wrangler.toml                 Cloudflare Pages project (pages_build_output_dir = dist)
-public/_headers               CSP and security headers
-src/main.tsx, src/App.tsx     bootstrap, screen routing (athletes/trainings/training/settings)
-src/sw.ts                     service worker source
-src/scoring.ts(.test)         ISSF decimal scoring, pure
-src/transform.ts(.test)       screen ↔ target coordinate mapping, pure
-src/db/                       IndexedDB: schema, open, tx (epoch), settings, startup cleanup
-src/domain/                   athleteRepo, trainingRepo, shotRepo, backupService
-src/components/               TargetCanvas (SVG target + shots), UpdateBanner
-src/screens/                  AthletesScreen, TrainingsScreen, TrainingScreen, SettingsScreen
-.agents/skills/               vendored Cloudflare/wrangler reference skills (not app code)
-```
-
-## 9. Stack and constraints
-
-TypeScript, React 18, Vite 5, vite-plugin-pwa + workbox-window, IndexedDB (raw, no wrapper),
-Vitest + fake-indexeddb, Cloudflare Pages hosting.
-Not allowed: backend API, Kubernetes/VPS, PostgreSQL, Cloudflare D1/KV, user accounts.
-
-Data conventions: coordinates stored as integer hundredths of mm (`xh`/`yh`), score as integer
-tenths (109..10, 0). Shot has status `draft` | `committed`. A `dataEpoch` value guards writes
-against stale clients after restore.
-
-## 10. Data and personal data rules
-
-- Only athlete name + training/shot data; no auth, no telemetry, no network transfer.
-- Everything stays in IndexedDB; app requests persistent storage and reminds about backups.
-- Backup/restore is the only data movement path, user-initiated, one JSON file
-  (`version: 1`), restore is validated and atomic; strings from backups are rendered as text only.
-- Filenames for backups are generated and sanitized by the app.
-
-## 11. Build, test, run
+## 2. Commands
 
 ```bash
 npm install
 npm run dev        # Vite dev server
-npm test           # vitest run (254 tests: scoring, transform, db, domain)
-npm run build      # tsc -p tsconfig.app.json && vite build → dist/
-npm run preview    # preview production build
+npx vitest run     # tests — must stay green (285 passing)
+npm run build      # tsc + vite build → dist/
+npm run preview
 ```
-Deployment: Cloudflare Pages, output dir `dist`.
 
-## 12. Documents to read for depth
+`npm test` also works. After code changes always run `npx vitest run`; run `npm run build` too if
+types could break.
 
-1. `plans/PLAN.md` — full functional and technical spec (domain model, gesture model, scoring §14,
-   backup §16–17, storage §19, MVP §26–27, implementation order §28).
-2. `CHANGES-TARGET-VISUAL.md` — exact ISSF target geometry and colors.
-3. `CLOUDFLARE-FREE-CONSTRAINTS.md` — hosting limits.
+## 3. Where things are
 
-## 13. Development workflow: Planning-first
+```
+src/scoring.ts        ISSF decimal score (pure)          + scoring.test.ts
+src/transform.ts      screen ↔ target coordinates (pure) + transform.test.ts
+src/db/               IndexedDB: schema, open, tx+epoch, settings, startup cleanup
+src/domain/           athleteRepo, trainingRepo, shotRepo, backupService
+src/components/       TargetCanvas (SVG target + shots), UpdateBanner
+src/screens/          AthletesScreen, TrainingsScreen, TrainingScreen, SettingsScreen
+src/App.tsx           screen routing        src/main.tsx bootstrap      src/sw.ts service worker
+public/_headers       CSP + security headers
+vite.config.ts        Vite + vite-plugin-pwa (injectManifest, prompt update)
+wrangler.toml         Cloudflare Pages (static hosting only, output dir dist)
+plans/PLAN.md         full spec, source of truth (RU)
+plans/PLAN-*.md       per-feature plans; use PLAN-TARGET-ZOOM.md as template
+CHANGES-TARGET-VISUAL.md  exact ISSF target geometry and colors
+```
 
-**RULE: Before every large implementation, creating and approving a plan is mandatory unless the user explicitly skips planning.**
+Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fake-indexeddb.
 
-Large implementation means a feature or a change affecting multiple files, layers, or user scenarios.
+## 4. Data conventions
 
-When a user requests new functionality:
+- Coordinates: integer hundredths of mm (`xh`, `yh`).
+- Score: integer tenths (109..10, or 0 for miss); displayed as ISSF decimal 10.0–10.9.
+- Shot status: `draft` | `committed`.
+- `TrainingRecord.nextShotNumber` is monotonic — shot numbers are event ordinals, NEVER renumbered.
+- `dataEpoch` guards writes from stale clients after a restore.
+- Backup = one JSON file (`version: 1`) with all data; see `BackupFile` in
+  `src/domain/backupService.ts`. Restore is validated and atomic. Backup strings render as text only.
 
-1. **Create a plan first** (`plans/PLAN-<feature-name>.md`) covering:
-   - Functional description and user scenarios
-   - Technical decisions and file changes
-   - Testing strategy (auto + manual)
-   - Acceptance criteria
-   - Rollback plan if needed
+## 5. Product decisions (locked)
 
-2. **Discuss the plan** with the user, iterate if needed
+- Phone-first, portrait-first PWA; tablet secondary; offline-first.
+- Coach must select/create an athlete before anything else; several athletes at once with fast
+  switching that must not reset the current training.
+- Training = sequence of N shots, no fixed series size; can be reopened and continued.
+- All hits are drawn on target, older ones less prominent.
+- Last shot and older shots are editable repeatedly; undo exists for the last created shot.
+- Deletion requires confirmation.
+- "Анализ — в разработке" stays a stub.
 
-3. **Only after approval**, split the implementation into small, independently verifiable tasks and delegate them to subagents. Each handoff must include:
-   - Clean context (`context: fresh`)
-   - Reference to the plan document
-   - One focused task with clear boundaries
-   - Clear acceptance criteria and verification command(s)
+Not in MVP: analysis, charts, group stats, comments, sighting/match series, sync, accounts,
+cloud DB, electronic-target integration, camera recognition, competitions, per-training export.
 
-### 13.1 Working with subagents
+## 6. Status
 
-- Before delegating, always select the most appropriate enabled subagent from the available
-  subagents for the task. Do not use a generic agent when a specialized agent is better suited.
-- `worker` is the **primary working model** for implementation work: code changes, related
-  tests/builds, and deployments.
-- All code changes, tests/builds related to those changes, and every deployment must be performed
-  through `worker`; the coordinator does not implement or deploy directly.
-- The coordinator is responsible for clarifying requirements, creating and discussing plans,
-  delegating to `worker`, and reviewing/reporting its result.
-- Break large work into small, independently verifiable tasks before delegation. Give each `worker`
-  handoff one focused task, relevant repository constraints, and explicit verification and acceptance
-  criteria. Use `context: fresh` for implementation and deployment handoffs.
-- Keep one `worker` writer in the shared working directory at a time. Parallel work that changes
-  files requires isolated worktrees and a deliberate integration step.
-- Deployment remains subject to the user's explicit request and all repository safety rules.
+Done: scoring, transform, IndexedDB layer, domain repos, all four screens, backup/restore, PWA,
+CSP, Cloudflare Pages config. Tests green (285).
+Partial: ISSF target visuals — verify against `CHANGES-TARGET-VISUAL.md` before touching.
+Missing: athlete switcher inside the training screen (`plans/PLAN.md` §6); analysis module.
 
-**Exceptions:** User explicitly says "skip planning" / "just do it" / "no plan needed".
+## 7. Delegating to subagents
 
-**Why:** Prevents rework, documents decisions, keeps codebase consistent with architecture.
+Agents (see `.pi/settings.json`), cheapest first: `scout` < `worker` < `reviewer` < `oracle`.
 
-**Plan template:** See `plans/PLAN-TARGET-ZOOM.md` as reference.
+| Task | Agent |
+| --- | --- |
+| Find files, "where is X", read-only recon | `scout` |
+| Write code, edit files, run tests/build, deploy | `worker` (only agent that edits) |
+| Check worker's result vs task/plan, run tests | `reviewer` (may apply small fixes) |
+| Risky design decision, or worker failed twice | `oracle` (advisory, never edits) |
 
-## Current Status
+Default pipeline: `scout` → plan → `worker` → `reviewer`.
 
-**Implemented**
-- ISSF decimal scoring module and coordinate transform (pure, tested: 216 + 15 tests).
-- IndexedDB layer: schema, versioned open, transaction/epoch guards, settings, startup cleanup.
-- Domain layer: athlete/training/shot repositories, undo of last committed shot,
-  full export/validate/import backup service.
-- UI: athletes screen (create, select, delete with confirmation, persistent-storage request),
-  trainings screen (create, open, delete with confirmation), training screen (target, tap/drag
-  input, live score, editing of last and older shots, undo), settings screen with
-  backup/restore and "Анализ — в разработке" stub.
-- PWA: manifest, service worker, update banner; CSP headers; Cloudflare Pages config.
-- Test suite green: 254 tests.
+Rules:
+- The coordinator does not edit code or deploy — always delegate to `worker`.
+- Use `context: fresh` for every implementation handoff.
+- One `worker` writing in the working directory at a time.
+- Every handoff = one focused task + plan reference + acceptance criteria + verification command
+  (usually `npx vitest run`).
+- Review after every `worker` code change, unless the user says "skip review" or the change is
+  trivial (docs/comments/formatting).
+- Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
+- Rework found by `reviewer` goes back to `worker`.
 
-**In progress / partial**
-- ISSF target visual per `CHANGES-TARGET-VISUAL.md` (rings and marker contrast fixed in recent
-  commits; verify against the spec before further changes).
+## 8. Output style
 
-**Not implemented**
-- Fast athlete switcher inside the training screen (`plans/PLAN.md` §6 dropdown); switching currently
-  requires navigating back to the athletes list.
-- Training analysis and everything listed in §7 above.
-
-**OPEN QUESTION**
-- Whether the "Анализ" stub will later grow into a full analysis module inside this app or a
-  separate tool — not decided in the repository.
+- Report only changed blocks (diff with 3–5 lines context), not whole files.
+- For test/build output report the summary line, or the filtered errors if it failed.
+- If the request is ambiguous, ask instead of guessing.

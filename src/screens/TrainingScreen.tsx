@@ -8,7 +8,7 @@ import {
    commitShot,
    deleteDraft,
    listShots,
-   deleteCommittedShotForUndo,
+   undoLastShot,
 } from '../domain/shotRepo';
 import { completeTraining } from '../domain/trainingRepo';
 import TargetCanvas from '../components/TargetCanvas';
@@ -27,11 +27,11 @@ const ZOOM_MODES: Array<'full' | 'zoom7'> = ['full', 'zoom7'];
 export default function TrainingScreen({ athlete, training, epoch, onBack }: Props) {
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [dragging, setDragging] = useState<{ shotId: string; xh: number; yh: number; isNew: boolean } | null>(null);
-   // Track the last created shot for undo
-  const [undoShot, setUndoShot] = useState<ShotRecord | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [zoomMode, setZoomMode] = useState<'full' | 'zoom7'>('full');
+  // Guards the async undo against rapid repeated clicks (stale state / double deletes).
+  const [busy, setBusy] = useState(false);
 
    // Load shots and settings on mount
   useEffect(() => {
@@ -67,10 +67,8 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       const draft = await createDraft(training.id, xh, yh, ep);
       setDragging({ shotId: draft.id, xh, yh, isNew: true });
       setShots(prev => [...prev, draft]);
-      setUndoShot(null); // any new action clears undo
     } else {
       setDragging({ shotId: shotId!, xh, yh, isNew: false });
-      setUndoShot(null); // editing clears undo
     }
   };
 
@@ -85,9 +83,6 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     const ep = await readEpoch(db);
     const updated = await commitShot(dragging.shotId, xh, yh, ep);
     setShots(prev => prev.map(s => s.id === updated.id ? updated : s).sort((a, b) => a.shotNumber - b.shotNumber));
-    if (dragging.isNew) {
-      setUndoShot(updated);
-    }
     setDragging(null);
   };
 
@@ -98,21 +93,28 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       const ep = await readEpoch(db);
       await deleteDraft(dragging.shotId, ep);
       setShots(prev => prev.filter(s => s.id !== dragging.shotId));
-      setUndoShot(null);
     }
     setDragging(null);
   };
 
-   // Undo: only the last created new shot
-  const canUndo = undoShot !== null && undoShot.id === shots[shots.length - 1]?.id;
+   // Undo: delete the most recent shot (LIFO). Selection of the last-created
+   // shot happens in the domain (undoLastShot reads fresh shots from
+   // IndexedDB), so repeated clicks always target the current last shot
+   // without relying on stale React state. nextShotNumber is monotonic and is
+   // deliberately NOT decremented here.
+  const canUndo = shots.length > 0 && dragging === null && !busy;
 
   const handleUndo = async () => {
-    if (!canUndo || !undoShot) return;
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    await deleteCommittedShotForUndo(undoShot.id, ep);
-    setShots(prev => prev.filter(s => s.id !== undoShot.id));
-    setUndoShot(null);
+    if (!canUndo || busy) return;
+    setBusy(true);
+    try {
+      const db = await openDB();
+      const ep = await readEpoch(db);
+      await undoLastShot(training.id, ep); // no-op when training has no shots
+      setShots(await listShots(training.id));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleComplete = async () => {

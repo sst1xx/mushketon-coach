@@ -148,6 +148,27 @@ export async function deleteCommittedShotForUndo(id: string, clientEpoch: number
   }));
 }
 
+// ─── undoLastShot ─────────────────────────────────────────────────────────────
+
+/**
+ * Delete the most recently created shot of a training (the one with the
+ * highest shotNumber — the counter is monotonic and never renumbered).
+ *
+ * Returns true when a shot was deleted, false when the training has no shots
+ * (no-op). TrainingRecord.nextShotNumber is intentionally left untouched so
+ * that shot numbers stay stable (monotonic design decision).
+ */
+export async function undoLastShot(
+  trainingId: string,
+  clientEpoch: number,
+): Promise<boolean> {
+  const current = await listShots(trainingId); // fresh, sorted by shotNumber asc
+  if (current.length === 0) return false;
+  const target = current[current.length - 1];
+  await deleteCommittedShotForUndo(target.id, clientEpoch);
+  return true;
+}
+
 // ─── listShots ───────────────────────────────────────────────────────────────
 
 export async function listShots(trainingId: string): Promise<ShotRecord[]> {
