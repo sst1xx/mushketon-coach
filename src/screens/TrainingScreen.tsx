@@ -32,6 +32,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
   const [zoomMode, setZoomMode] = useState<'full' | 'zoom7'>('full');
   // Guards the async undo against rapid repeated clicks (stale state / double deletes).
   const [busy, setBusy] = useState(false);
+  const [nextShotNumber, setNextShotNumber] = useState(training.nextShotNumber);
 
    // Load shots and settings on mount
   useEffect(() => {
@@ -57,14 +58,16 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     return '–';
   })();
 
-   // Shot number for header
-  const shotNumber = training.nextShotNumber;
+   // Shot number for header. Keep this local because the training prop is a
+   // snapshot and createDraft advances the persisted counter.
+  const shotNumber = nextShotNumber;
 
   const handleDragStart = async (shotId: string | null, xh: number, yh: number, isExisting: boolean) => {
     const db = await openDB();
     const ep = await readEpoch(db);
     if (!isExisting) {
       const draft = await createDraft(training.id, xh, yh, ep);
+      setNextShotNumber(draft.shotNumber + 1);
       setDragging({ shotId: draft.id, xh, yh, isNew: true });
       setShots(prev => [...prev, draft]);
     } else {
