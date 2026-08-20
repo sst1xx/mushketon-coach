@@ -17,12 +17,14 @@ const RING_D: Record<number, number> = {
 // Ring labels: each digit is centered in the 8 mm band between its own ring
 // boundary and the next inner boundary. No ring 10 label is rendered.
 const ZOOM7_SCALE = 80 / (RING_D[7] / 2);
+const ZOOM9_SCALE = 80 / (RING_D[9] / 2);
 
 // Shot markers keep their current screen size in zoom7; in full mode they are
 // scaled down proportionally so they don't dominate the small rings.
 const MARKER_SCALE = {
   full: (RING_D[7] / 2) / 80,
   zoom7: 1,
+  zoom9: (RING_D[7] / 2) / (RING_D[9] / 2),
 } as const;
 
 // Base marker dimensions (emphasis = last shot or the one being dragged).
@@ -31,7 +33,7 @@ const MARKER_DIMS = {
   regular: { rInner: 3.64, rOuter: 4.29, fontSize: 3.12 },
 } as const;
 
-export type ZoomMode = 'full' | 'zoom7';
+export type ZoomMode = 'full' | 'zoom7' | 'zoom9';
 
 /** Pure helper mirroring computeRingLabels: marker geometry per zoom mode. */
 export function getShotMarkerDims(
@@ -50,9 +52,9 @@ export function getShotMarkerDims(
 
 type LabelEntry = { n: number; r: number; color: 'white' | 'black' };
 
-export function computeRingLabels(zoomMode: 'full' | 'zoom7'): LabelEntry[] {
-  const scale = zoomMode === 'zoom7' ? ZOOM7_SCALE : 1;
-  const ringNumbers = zoomMode === 'zoom7' ? [9, 8, 7] : [9, 8, 7, 6, 5, 4, 3, 2, 1];
+export function computeRingLabels(zoomMode: ZoomMode): LabelEntry[] {
+  const scale = zoomMode === 'zoom7' ? ZOOM7_SCALE : zoomMode === 'zoom9' ? ZOOM9_SCALE : 1;
+  const ringNumbers = zoomMode === 'zoom7' ? [9, 8, 7] : zoomMode === 'zoom9' ? [9] : [9, 8, 7, 6, 5, 4, 3, 2, 1];
   return ringNumbers.map(n => ({
     n,
     // Center of the band between ring n and ring n + 1
@@ -76,7 +78,7 @@ const LABEL_DIRS: Array<[number, number]> = [
 interface Props {
   shots: ShotRecord[];
   dragging: { shotId: string; xh: number; yh: number } | null;
-  zoomMode: 'full' | 'zoom7';
+  zoomMode: ZoomMode;
   onDragStart: (shotId: string | null, xh: number, yh: number, isExisting: boolean) => void;
   onDragMove: (xh: number, yh: number) => void;
   onDragEnd: (xh: number, yh: number) => void;
@@ -110,7 +112,8 @@ export default function TargetCanvas({
 
   // Zoom scale: makes the zoomed zone fill the full 80-unit radius of the viewBox
   const isZoom7 = zoomMode === 'zoom7';
-  const ZOOM_SCALE = isZoom7 ? 80 / (RING_D[7] / 2) : 1;
+  const isZoom9 = zoomMode === 'zoom9';
+  const ZOOM_SCALE = isZoom7 ? ZOOM7_SCALE : isZoom9 ? ZOOM9_SCALE : 1;
 
   // Convert a pointer event's position to xh/yh target coords (descaled for zoom)
   const pointerToActualTarget = useCallback((clientX: number, clientY: number) => {
@@ -206,7 +209,7 @@ export default function TargetCanvas({
     return candidates.reduce((a, b) => a.shotNumber > b.shotNumber ? a : b);
   })();
 
-  const labelFont = isZoom7 ? LABEL_FONT_ZOOM7 : LABEL_FONT_FULL;
+  const labelFont = isZoom7 || isZoom9 ? LABEL_FONT_ZOOM7 : LABEL_FONT_FULL;
   const ringLabels = computeRingLabels(zoomMode);
 
   return (
@@ -241,13 +244,14 @@ export default function TargetCanvas({
         <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
 
         {/* 2. Black zone: solid black circle up to ring-7 boundary (scaled for zoom) */}
-        <circle cx={CENTER} cy={CENTER} r={RING_D[7] / 2 * ZOOM_SCALE} fill="black" />
+        <circle cx={CENTER} cy={CENTER}
+          r={(isZoom9 ? RING_D[9] : RING_D[7]) / 2 * ZOOM_SCALE} fill="black" />
 
         {/* 3. Ring boundary lines (radii scaled by ZOOM_SCALE) */}
-        {isZoom7 ? (
+        {isZoom7 || isZoom9 ? (
           <>
-            {/* Zoom7: outer boundary at ring-7 (= full viewBox), inner boundaries for 8, 9, 10 */}
-            {([8, 9] as const).map(n => (
+            {/* Zoomed views: outer boundary is the selected ring, with inner rings shown. */}
+            {(isZoom7 ? [8, 9] : [10]).map(n => (
               <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2 * ZOOM_SCALE}
                 fill="none" stroke="white" strokeWidth={0.3} />
             ))}

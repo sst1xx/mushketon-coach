@@ -21,13 +21,13 @@ interface Props {
 }
 
 // Zoom modes in cyclical order — extend here to add intermediate zoom levels
-const ZOOM_MODES: Array<'full' | 'zoom7'> = ['full', 'zoom7'];
+const ZOOM_MODES: Array<'full' | 'zoom7' | 'zoom9'> = ['full', 'zoom7', 'zoom9'];
 
 export default function TrainingScreen({ athlete, training, epoch, onBack }: Props) {
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [dragging, setDragging] = useState<{ shotId: string; xh: number; yh: number; isNew: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [zoomMode, setZoomMode] = useState<'full' | 'zoom7'>('full');
+  const [zoomMode, setZoomMode] = useState<'full' | 'zoom7' | 'zoom9'>('full');
   // Guards the async undo against rapid repeated clicks (stale state / double deletes).
   const [busy, setBusy] = useState(false);
   const [nextShotNumber, setNextShotNumber] = useState(training.nextShotNumber);
@@ -39,7 +39,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       setShots(loaded);
       const db = await openDB();
       const zm = await getSetting(db, 'targetZoomMode');
-      if (zm === 'zoom7' || zm === 'full') setZoomMode(zm);
+      if (zm === 'zoom7' || zm === 'zoom9' || zm === 'full') setZoomMode(zm);
       setLoading(false);
     })();
    }, [training.id]);
