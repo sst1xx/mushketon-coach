@@ -16,10 +16,14 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 6. Keep scoring/geometry pure: `src/scoring.ts`, `src/transform.ts` must contain no React and no I/O.
 7. Before any large change (multiple files/layers), write a plan in `plans/PLAN-<feature>.md` and
    get approval — unless the user says "skip planning" / "just do it".
+8. NEVER edit files in `main/`. `main/` is read-only reference; all work happens in a `wt-*/`
+   worktree and reaches `main` only through merge. Direct edits in `main/` require an explicit
+   one-off user request.
 
 ## 2. Commands
 
-All commands run **inside a worktree** (`main/` or `wt-*/`), not in the container root.
+All commands run **inside a `wt-*/` worktree**, not in the container root and not in `main/`
+(in `main/` read-only commands are allowed).
 
 ```bash
 npm install
@@ -60,7 +64,7 @@ mushketon-coach/        # container, path never changes — pi runs from here
 ├── .pi/ .claude/ .agents/               # pi/agent config — root only, never in a worktree
 ├── .wrangler/ .env  node_modules/      # build/deploy state — real here, symlinked into worktrees
 ├── link-shared.sh       # symlinks .wrangler/.env/node_modules into a worktree
-├── main/                # worktree of branch main — code only + the symlinks above
+├── main/                # worktree of branch main — read-only, never edited directly
 └── wt-<feature>/        # feature worktrees, created on demand
 ```
 
@@ -116,6 +120,7 @@ Default pipeline: `scout` → plan → `worker` → `reviewer`.
 
 Rules:
 - The coordinator does not edit code or deploy — always delegate to `worker`.
+- `worker` always runs inside a `wt-*/` worktree, never in `main/`.
 - Use `context: fresh` for every implementation handoff.
 - One `worker` writing in the working directory at a time.
 - Every handoff = one focused task + plan reference + acceptance criteria + verification command
@@ -141,6 +146,7 @@ cd wt-<feature> && npx vitest run
 Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
 
 Rules:
+- `main/` is never a work directory: no edits, no `worker` runs there.
 - `plans/` and code are versioned per branch, same as before.
 - `.wrangler`, `.env`, `node_modules` live for real at the container root; each worktree gets
   **symlinks** to them via `link-shared.sh` (needed to build/test/deploy from inside the worktree).
