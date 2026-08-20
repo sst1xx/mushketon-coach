@@ -235,19 +235,6 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
       );
      }
 
-  // 9. At most one active training per athlete
-  const trainingsByAthlete = new Map<string, TrainingRecord[]>();
-  for (const t of file.trainings as TrainingRecord[]) {
-     const arr = trainingsByAthlete.get(t.athleteId) || [];
-    arr.push(t);
-    trainingsByAthlete.set(t.athleteId, arr);
-     }
-  for (const [aid, trs] of trainingsByAthlete) {
-    const active = trs.filter((t) => t.completedAt === null);
-    if (active.length > 1)
-      throw new Error(`Multiple active trainings for athlete ${aid}`);
-     }
-
   // 13. Settings whitelist
   const st = file.settings as any;
   for (const key of Object.keys(st)) {

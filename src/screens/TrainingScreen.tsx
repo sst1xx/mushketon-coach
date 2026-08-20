@@ -10,7 +10,6 @@ import {
    listShots,
    undoLastShot,
 } from '../domain/shotRepo';
-import { completeTraining } from '../domain/trainingRepo';
 import TargetCanvas from '../components/TargetCanvas';
 import { getSetting, setSetting } from '../db/settings';
 
@@ -27,7 +26,6 @@ const ZOOM_MODES: Array<'full' | 'zoom7'> = ['full', 'zoom7'];
 export default function TrainingScreen({ athlete, training, epoch, onBack }: Props) {
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [dragging, setDragging] = useState<{ shotId: string; xh: number; yh: number; isNew: boolean } | null>(null);
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [zoomMode, setZoomMode] = useState<'full' | 'zoom7'>('full');
   // Guards the async undo against rapid repeated clicks (stale state / double deletes).
@@ -120,14 +118,6 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     }
   };
 
-  const handleComplete = async () => {
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    await completeTraining(training.id, ep);
-    setShowCompleteConfirm(false);
-    onBack();
-  };
-
    // Toggle zoom mode cyclically
   const toggleZoom = async () => {
     const currentIdx = ZOOM_MODES.indexOf(zoomMode);
@@ -180,29 +170,8 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
         >
           UNDO
         </button>
-        <button style={s.completeBtn} onClick={() => setShowCompleteConfirm(true)}>
-          Завершить
-        </button>
       </div>
 
-      {/* Complete confirmation dialog */}
-      {showCompleteConfirm && (
-        <div style={s.overlay}>
-          <div style={s.dialog}>
-            <p>Завершить тренировку?</p>
-            <p style={s.dialogInfo}>{committedCount} выстрелов</p>
-            <p style={s.dialogInfo}>Среднее {avgScore.toFixed(2)}</p>
-            <div style={s.dialogBtns}>
-              <button style={s.btnGhost} onClick={() => setShowCompleteConfirm(false)}>
-                Продолжить
-              </button>
-              <button style={s.btnDanger} onClick={handleComplete}>
-                Завершить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

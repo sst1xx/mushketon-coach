@@ -9,8 +9,6 @@ import {
    createTraining,
    listTrainings,
    getTraining,
-   completeTraining,
-   resumeTraining,
    deleteTraining,
    createDraft,
    commitShot,
@@ -90,36 +88,14 @@ describe('trainingRepo', () => {
     expect(t.completedAt).toBeNull();
     });
 
-  it('createTraining auto-completes existing active (§13.1.a)', async () => {
+  it('createTraining allows multiple active trainings', async () => {
     const epoch = await setup();
     const a = await createAthlete('T');
     const t1 = await createTraining(a.id, epoch);
-    expect(t1.completedAt).toBeNull();
     const t2 = await createTraining(a.id, epoch);
-    const reT1 = await getTraining(t1.id);
-    expect(reT1!.completedAt).not.toBeNull();
-    expect(t2.completedAt).toBeNull();
-    });
-
-  it('resumeTraining sets completedAt=null and completes other active (§13.1.b)', async () => {
-    const epoch = await setup();
-    const a = await createAthlete('T');
-    const t1 = await createTraining(a.id, epoch);
-    await completeTraining(t1.id, epoch);
-    expect((await getTraining(t1.id))!.completedAt).not.toBeNull();
-    const t2 = await createTraining(a.id, epoch);
-    await resumeTraining(t1.id, epoch);
     expect((await getTraining(t1.id))!.completedAt).toBeNull();
-    expect((await getTraining(t2.id))!.completedAt).not.toBeNull();
-    });
-
-  it('completeTraining sets completedAt', async () => {
-    const epoch = await setup();
-    const a = await createAthlete('T');
-    const t = await createTraining(a.id, epoch);
-    await completeTraining(t.id, epoch);
-    expect((await getTraining(t.id))!.completedAt).not.toBeNull();
-    });
+    expect(t2.completedAt).toBeNull();
+  });
 });
 
 // ─── shotRepo ────────────────────────────────────────────────────────────────
@@ -269,22 +245,6 @@ describe('backupService', () => {
         settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
          };
     expect(() => validateBackup(fake)).toThrow(/Duplicate shotNumber/i);
-    });
-
-  it('validateBackup rejects two active trainings for same athlete', () => {
-     const now = new Date().toISOString();
-    const fake = {
-        version: 1,
-        exportedAt: now,
-        athletes: [{ id: 'a1', name: 'X', createdAt: now, updatedAt: now }],
-        trainings: [
-          { id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1 },
-          { id: 't2', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1 },
-          ],
-        shots: [],
-        settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
-         };
-    expect(() => validateBackup(fake)).toThrow(/Multiple active trainings/i);
     });
 
   it('validateBackup rejects draft shot in backup', () => {
