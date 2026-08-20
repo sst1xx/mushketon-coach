@@ -168,7 +168,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
           onClick={handleUndo}
           disabled={!canUndo}
         >
-          UNDO
+          Отменить последний
         </button>
       </div>
 
