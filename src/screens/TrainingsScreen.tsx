@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { openDB } from '../db/open';
 import { readEpoch } from '../db/tx';
 import { AthleteRecord, TrainingRecord } from '../db/schema';
-import { createTraining, listTrainings, completeTraining, resumeTraining, deleteTraining } from '../domain/trainingRepo';
+import { createTraining, listTrainings, deleteTraining } from '../domain/trainingRepo';
 
 interface Props {
   athlete: AthleteRecord;
@@ -14,7 +14,6 @@ interface Props {
 export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining }: Props) {
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirmNewWithActive, setConfirmNewWithActive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
 
   const load = useCallback(async () => {
@@ -25,34 +24,10 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
   useEffect(() => { load(); }, [load]);
 
   const handleNew = async () => {
-    const active = trainings.find(t => !t.completedAt);
-    if (active) { setConfirmNewWithActive(true); return; }
     const db = await openDB();
     const ep = await readEpoch(db);
     const newTraining = await createTraining(athlete.id, ep);
     onSelectTraining(newTraining);
-   };
-
-  const handleNewConfirmed = async () => {
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    const newTraining = await createTraining(athlete.id, ep);
-    setConfirmNewWithActive(false);
-    onSelectTraining(newTraining);
-   };
-
-  const handleResume = async (t: TrainingRecord) => {
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    await resumeTraining(t.id, ep);
-    await load();
-   };
-
-  const handleComplete = async (t: TrainingRecord) => {
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    await completeTraining(t.id, ep);
-    await load();
    };
 
   const handleDelete = async (t: TrainingRecord) => {
@@ -84,16 +59,9 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
              <button style={s.itemTap} onClick={() => onSelectTraining(t)}>
                <div style={s.itemMain}>
                  <span style={s.date}>{formatDate(t.startedAt)}</span>
-                 {!t.completedAt && <span style={s.badge}>активная</span>}
-               </div>
+                </div>
              </button>
              <div style={s.itemActions}>
-               {t.completedAt && (
-                 <button style={s.btnSmall} onClick={() => handleResume(t)}>Продолжить</button>
-               )}
-               {!t.completedAt && (
-                 <button style={s.btnSmall} onClick={() => handleComplete(t)}>Завершить</button>
-               )}
                <button style={s.delBtn} onClick={() => setConfirmDelete(t)}>✕</button>
              </div>
            </li>
@@ -101,19 +69,6 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
        </ul>
 
        <button style={s.addBtn} onClick={handleNew}>+ Новая тренировка</button>
-
-       {confirmNewWithActive && (
-         <div style={s.overlay}>
-           <div style={s.dialog}>
-             <p>У спортсмена уже есть активная тренировка.</p>
-             <p>Завершить её и создать новую?</p>
-             <div style={s.dialogBtns}>
-               <button style={s.btnGhost} onClick={() => setConfirmNewWithActive(false)}>Отмена</button>
-               <button style={s.btn} onClick={handleNewConfirmed}>Создать</button>
-             </div>
-           </div>
-         </div>
-       )}
 
        {confirmDelete && (
          <div style={s.overlay}>
