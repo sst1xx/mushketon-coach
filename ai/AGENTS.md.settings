@@ -14,7 +14,7 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
    origins, `unsafe-inline`/`unsafe-eval` in CSP, new runtime dependencies.
 5. Change only what the task requires. Do not refactor or reformat adjacent code.
 6. Keep scoring/geometry pure: `src/scoring.ts`, `src/transform.ts` must contain no React and no I/O.
-7. Before any large change (multiple files/layers), write a plan in `plans/PLAN-<feature>.md` and
+7. Before any large change (multiple files/layers), write a plan in `docs/plans/PLAN-<feature>.md` and
    get approval — unless the user says "skip planning" / "just do it".
 8. NEVER edit files in `main/`. `main/` is read-only reference; all work happens in a `wt-*/`
    worktree and reaches `main` only through merge. Direct edits in `main/` require an explicit
@@ -49,12 +49,12 @@ src/App.tsx           screen routing        src/main.tsx bootstrap      src/sw.t
 public/_headers       CSP + security headers
 vite.config.ts        Vite + vite-plugin-pwa (injectManifest, prompt update)
 wrangler.toml         Cloudflare Pages (static hosting only, output dir dist)
-plans/PLAN.md         full spec, source of truth (RU)
-plans/PLAN-*.md       per-feature plans; use PLAN-TARGET-ZOOM.md as template
-CHANGES-TARGET-VISUAL.md  exact ISSF target geometry and colors
+docs/plans/PLAN.md         full spec, source of truth (RU)
+docs/plans/PLAN-*.md       per-feature plans; use docs/plans/PLAN-TARGET-ZOOM.md as template
+docs/reference/CHANGES-TARGET-VISUAL.md  exact ISSF target geometry and colors
 ```
 
-All paths above (`src/…`, `plans/…`, etc.) are relative to the **current worktree**, e.g.
+All paths above (`src/…`, `docs/plans/…`, etc.) are relative to the **current worktree**, e.g.
 `main/src/scoring.ts`. Container layout (see §9 Worktrees):
 
 ```
@@ -102,8 +102,8 @@ cloud DB, electronic-target integration, camera recognition, competitions, per-t
 
 Done: scoring, transform, IndexedDB layer, domain repos, all four screens, backup/restore, PWA,
 CSP, Cloudflare Pages config. Tests green (285).
-Partial: ISSF target visuals — verify against `CHANGES-TARGET-VISUAL.md` before touching.
-Missing: athlete switcher inside the training screen (`plans/PLAN.md` §6); analysis module.
+Partial: ISSF target visuals — verify against `docs/reference/CHANGES-TARGET-VISUAL.md` before touching.
+Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6); analysis module.
 
 ## 7. Delegating to subagents
 
@@ -163,7 +163,7 @@ Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
 
 Rules:
 - `main/` is never a work directory: no edits, no `worker` runs there.
-- `plans/` and code are versioned per branch, same as before.
+- `docs/plans/` and code are versioned per branch, same as before.
 - `.wrangler`, `.env`, `node_modules` live for real at the container root; each worktree gets
   **symlinks** to them via `link-shared.sh` (needed to build/test/deploy from inside the worktree).
   Never commit the symlinks, never edit the shared configs "for one branch only".

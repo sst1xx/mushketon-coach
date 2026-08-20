@@ -137,4 +137,4 @@ const modes: ZoomMode[] = ['full', 'zoom7', 'zoom8'];
 
 ---
 
-**Читай BUG-TARGET-ZOOM-VISUAL.md для полного контекста и визуальных примеров.**
+**Читай docs/bugs/BUG-TARGET-ZOOM-VISUAL.md для полного контекста и визуальных примеров.**
