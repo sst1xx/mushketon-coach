@@ -82,6 +82,7 @@ export default function App() {
         training={screen.training}
         epoch={epoch}
         onBack={() => setScreen({ name: 'trainings', athlete: screen.athlete })}
+        onNewTraining={(newTraining) => setScreen({ name: 'training', athlete: screen.athlete, training: newTraining })}
       />
     );
   }

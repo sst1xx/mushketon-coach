@@ -7,6 +7,9 @@ import {
    listAthletes,
    deleteAthlete,
    createTraining,
+   completeTraining,
+   shouldCompleteTrainingAfterShot,
+   isTrainingLimitReached,
    listTrainings,
    getTraining,
    deleteTraining,
@@ -80,13 +83,34 @@ describe('trainingRepo', () => {
   beforeEach(setup);
   afterEach(teardown);
 
-  it('createTraining creates with nextShotNumber=1', async () => {
+  it('createTraining creates with nextShotNumber=1 and default targetShotCount=10', async () => {
     const epoch = await setup();
     const a = await createAthlete('T');
     const t = await createTraining(a.id, epoch);
     expect(t.nextShotNumber).toBe(1);
     expect(t.completedAt).toBeNull();
-    });
+    expect(t.targetShotCount).toBe(10);
+  });
+
+  it('createTraining supports null targetShotCount for unlimited trainings', async () => {
+    const epoch = await setup();
+    const a = await createAthlete('T');
+    const t = await createTraining(a.id, epoch, null);
+    expect(t.targetShotCount).toBeNull();
+  });
+
+  it('completeTraining marks training as completed with ISO timestamp', async () => {
+    const epoch = await setup();
+    const a = await createAthlete('T');
+    const t = await createTraining(a.id, epoch);
+    expect(t.completedAt).toBeNull();
+
+    const completed = await completeTraining(t.id, epoch);
+    expect(completed.completedAt).not.toBeNull();
+    expect(typeof completed.completedAt).toBe('string');
+    const fetched = await getTraining(t.id);
+    expect(fetched?.completedAt).toBe(completed.completedAt);
+  });
 
   it('createTraining allows multiple active trainings', async () => {
     const epoch = await setup();
@@ -202,6 +226,114 @@ describe('shotRepo', () => {
     // Counter is monotonic — never decremented by undo
     expect((await getTraining(trainingId))!.nextShotNumber).toBe(before);
   });
+
+  it('allows editing and undoing shots on a completed training', async () => {
+    // Fill up to 10 shots
+    const shotIds: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const d = await createDraft(trainingId, 100 + i * 10, 200, epoch);
+      const c = await commitShot(d.id, 100 + i * 10, 200, epoch);
+      shotIds.push(c.id);
+    }
+    const completed = await completeTraining(trainingId, epoch);
+    expect(completed.completedAt).not.toBeNull();
+
+    // Editing existing shots is permitted after completion
+    await updateCoords(shotIds[0], 0, 0, epoch);
+    const updatedShots = await listShots(trainingId);
+    expect(updatedShots.find(s => s.id === shotIds[0])?.x).toBe(0);
+
+    // Undoing last shot is permitted after completion
+    expect(await undoLastShot(trainingId, epoch)).toBe(true);
+    expect(await listShots(trainingId)).toHaveLength(9);
+  });
+
+  it('createDraft rejects adding a shot to a completed training (both limited and unlimited)', async () => {
+    // 1. Unlimited training completed
+    const tUnlim = await createTraining((await createAthlete('U')).id, epoch, null);
+    await completeTraining(tUnlim.id, epoch);
+    await expect(createDraft(tUnlim.id, 100, 200, epoch)).rejects.toThrow(/completed/i);
+
+    // 2. Limited training completed
+    const tLim = await createTraining((await createAthlete('L')).id, epoch, 10);
+    await completeTraining(tLim.id, epoch);
+    await expect(createDraft(tLim.id, 100, 200, epoch)).rejects.toThrow(/completed/i);
+  });
+
+  it('unlimited training allows adding > 10 shots without auto-completion or blocking', async () => {
+    const tUnlim = await createTraining((await createAthlete('U2')).id, epoch, null);
+    for (let i = 0; i < 15; i++) {
+      const d = await createDraft(tUnlim.id, 100 + i, 200, epoch);
+      await commitShot(d.id, 100 + i, 200, epoch);
+    }
+    const shots = await listShots(tUnlim.id);
+    expect(shots).toHaveLength(15);
+    const fetched = await getTraining(tUnlim.id);
+    expect(fetched?.completedAt).toBeNull();
+  });
+
+  it('createDraft blocks creating draft when targetShotCount is reached even if not yet marked completed', async () => {
+    const tLim = await createTraining((await createAthlete('LimAtomic')).id, epoch, 5);
+    for (let i = 1; i <= 5; i++) {
+      const d = await createDraft(tLim.id, 100 + i, 200, epoch);
+      await commitShot(d.id, 100 + i, 200, epoch);
+    }
+    const current = await getTraining(tLim.id);
+    expect(current?.completedAt).toBeNull();
+
+    // 6th shot draft must be rejected atomically at domain boundary
+    await expect(createDraft(tLim.id, 160, 200, epoch)).rejects.toThrow(/limit/i);
+  });
+
+  it('production seam shouldCompleteTrainingAfterShot transitions 9 (false) -> 10 (true) and next createDraft rejects', async () => {
+    const tLim = await createTraining((await createAthlete('LimSeam')).id, epoch, 10);
+    expect(tLim.completedAt).toBeNull();
+
+    // Shots 1 to 9: shouldCompleteTrainingAfterShot must be false after each commit
+    for (let i = 1; i <= 9; i++) {
+      const d = await createDraft(tLim.id, 100 + i, 200, epoch);
+      await commitShot(d.id, 100 + i, 200, epoch);
+      const shots = await listShots(tLim.id);
+      const committedCount = shots.filter(s => s.status === 'committed').length;
+      expect(committedCount).toBe(i);
+      expect(shouldCompleteTrainingAfterShot(tLim, committedCount)).toBe(false);
+    }
+
+    // Shot 10: shouldCompleteTrainingAfterShot must return true for production completion trigger
+    const d10 = await createDraft(tLim.id, 110, 200, epoch);
+    await commitShot(d10.id, 110, 200, epoch);
+    const shots10 = await listShots(tLim.id);
+    const count10 = shots10.filter(s => s.status === 'committed').length;
+    expect(count10).toBe(10);
+    expect(shouldCompleteTrainingAfterShot(tLim, count10)).toBe(true);
+
+    // 11th createDraft must be rejected atomically at domain boundary
+    await expect(createDraft(tLim.id, 120, 200, epoch)).rejects.toThrow(/limit/i);
+
+    // When TrainingScreen invokes completeTraining upon shouldCompleteTrainingAfterShot returning true:
+    const completed = await completeTraining(tLim.id, epoch);
+    expect(completed.completedAt).not.toBeNull();
+    // After completion, helper returns false (already completed) and createDraft rejects with completed
+    expect(shouldCompleteTrainingAfterShot(completed, count10)).toBe(false);
+    await expect(createDraft(tLim.id, 120, 200, epoch)).rejects.toThrow(/completed/i);
+  });
+
+  it('pure seam shouldCompleteTrainingAfterShot respects legacy and unlimited trainings', () => {
+    const now = new Date().toISOString();
+    // Legacy training without targetShotCount field
+    const legacy = { id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 11 } as any;
+    expect(shouldCompleteTrainingAfterShot(legacy, 10)).toBe(false);
+    expect(shouldCompleteTrainingAfterShot(legacy, 100)).toBe(false);
+
+    // Explicit unlimited training (targetShotCount = null)
+    const unlimited = { id: 't2', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 11, targetShotCount: null };
+    expect(shouldCompleteTrainingAfterShot(unlimited, 10)).toBe(false);
+    expect(shouldCompleteTrainingAfterShot(unlimited, 100)).toBe(false);
+
+    // Already completed limited training
+    const completed = { id: 't3', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: now, nextShotNumber: 11, targetShotCount: 10 };
+    expect(shouldCompleteTrainingAfterShot(completed, 10)).toBe(false);
+  });
 });
 
 // ─── backupService ───────────────────────────────────────────────────────────
@@ -228,6 +360,7 @@ describe('backupService', () => {
     const b2 = await exportBackup();
     expect(b2.athletes[0].id).toBe(b1.athletes[0].id);
     expect(b2.trainings[0].id).toBe(b1.trainings[0].id);
+    expect(b2.trainings[0].targetShotCount).toBe(10);
     expect(b2.shots[0].id).toBe(b1.shots[0].id);
     });
 
@@ -274,4 +407,37 @@ describe('backupService', () => {
          };
     expect(() => validateBackup(fake)).toThrow(/Unknown settings key/i);
     });
+
+  it('validateBackup validates targetShotCount correctly', () => {
+    const now = new Date().toISOString();
+    const baseBackup = {
+      version: 1,
+      exportedAt: now,
+      athletes: [{ id: 'a1', name: 'X', createdAt: now, updatedAt: now }],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 10 }],
+      shots: [],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+
+    // Valid positive integer
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: 10 }] })).not.toThrow();
+    // Valid null (unlimited)
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: null }] })).not.toThrow();
+    // Valid undefined (legacy omitted)
+    const { targetShotCount, ...legacyTraining } = baseBackup.trainings[0];
+    expect(() => validateBackup({ ...baseBackup, trainings: [legacyTraining] })).not.toThrow();
+
+    // Invalid: 0
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: 0 }] })).toThrow(/Invalid targetShotCount/i);
+    // Invalid: negative
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: -5 }] })).toThrow(/Invalid targetShotCount/i);
+    // Invalid: float
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: 10.5 }] })).toThrow(/Invalid targetShotCount/i);
+    // Invalid: NaN
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: NaN }] })).toThrow(/Invalid targetShotCount/i);
+    // Invalid: Infinity
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: Infinity }] })).toThrow(/Invalid targetShotCount/i);
+    // Invalid: string
+    expect(() => validateBackup({ ...baseBackup, trainings: [{ ...baseBackup.trainings[0], targetShotCount: '10' as any }] })).toThrow(/Invalid targetShotCount/i);
+  });
 });

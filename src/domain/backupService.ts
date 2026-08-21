@@ -175,6 +175,8 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
       throw new Error(`startedAt > completedAt: ${t.id}`);
     if (typeof t.nextShotNumber !== 'number' || t.nextShotNumber < 1)
       throw new Error(`Invalid nextShotNumber: ${t.id}`);
+    if (t.targetShotCount !== undefined && t.targetShotCount !== null && (!Number.isInteger(t.targetShotCount) || t.targetShotCount < 1))
+      throw new Error(`Invalid targetShotCount: ${t.id}`);
     }
 
   // 6–8, 12 for shots

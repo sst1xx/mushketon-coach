@@ -18,6 +18,7 @@ export interface TrainingRecord {
   updatedAt: string;
   completedAt: string | null;
   nextShotNumber: number;
+  targetShotCount?: number | null;
 }
 
 export type ShotStatus = 'draft' | 'committed';

@@ -4,12 +4,17 @@ import { readEpoch } from '../db/tx';
 import { score } from '../scoring';
 import { AthleteRecord, TrainingRecord, ShotRecord } from '../db/schema';
 import {
-   createDraft,
-   commitShot,
-   deleteDraft,
-   listShots,
-   undoLastShot,
+  createDraft,
+  commitShot,
+  deleteDraft,
+  listShots,
+  undoLastShot,
 } from '../domain/shotRepo';
+import {
+  createTraining,
+  completeTraining,
+  shouldCompleteTrainingAfterShot,
+} from '../domain/trainingRepo';
 import TargetCanvas from '../components/TargetCanvas';
 import { getSetting, setSetting } from '../db/settings';
 import {
@@ -24,12 +29,14 @@ interface Props {
   training: TrainingRecord;
   epoch: number;
   onBack: () => void;
+  onNewTraining?: (newTraining: TrainingRecord) => void;
 }
 
 // Zoom modes in cyclical order — extend here to add intermediate zoom levels
 const ZOOM_MODES: Array<'full' | 'zoom7' | 'zoom9'> = ['full', 'zoom7', 'zoom9'];
 
-export default function TrainingScreen({ athlete, training, epoch, onBack }: Props) {
+export default function TrainingScreen({ athlete, training, epoch, onBack, onNewTraining }: Props) {
+  const [currentTraining, setCurrentTraining] = useState<TrainingRecord>(training);
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [dragging, setDragging] = useState<{ shotId: string; xh: number; yh: number; isNew: boolean } | null>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
@@ -40,10 +47,13 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
   // comment modal state
   const [commentModal, setCommentModal] = useState<{ shotId: string; shotNumber: number; existingCommentId: string | null } | null>(null);
   const [commentText, setCommentText] = useState('');
+  // Completed limit warning modal
+  const [showCompletedModal, setShowCompletedModal] = useState(false);
 
-   // Load shots and settings on mount
+  // Load shots and settings on mount / training switch
   useEffect(() => {
     (async () => {
+      setCurrentTraining(training);
       const loaded = await listShots(training.id);
       setShots(loaded);
       setSelectedShotId(null);
@@ -52,12 +62,17 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       if (zm === 'zoom7' || zm === 'zoom9' || zm === 'full') setZoomMode(zm);
       setLoading(false);
     })();
-   }, [training.id]);
+  }, [training]);
 
   const lastShot = shots.length > 0 ? shots[shots.length - 1] : null;
   const targetShot = (selectedShotId ? shots.find(s => s.id === selectedShotId) : null) ?? lastShot;
+  const committedCount = shots.filter(s => s.status === 'committed').length;
 
-   // Score display
+  const isCompleted = Boolean(currentTraining.completedAt);
+  const isLimited = typeof currentTraining.targetShotCount === 'number' && currentTraining.targetShotCount > 0;
+  const limit = currentTraining.targetShotCount ?? null;
+
+  // Score display
   const displayScore = (() => {
     if (dragging) {
       const tenths = score(dragging.xh, dragging.yh);
@@ -68,15 +83,17 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     return '–';
   })();
 
-   // Shot number for header. Keep this local because the training prop is a
-   // snapshot and createDraft advances the persisted counter.
-  const shotNumber = targetShot ? targetShot.shotNumber : (shots.length > 0 ? shots[shots.length - 1].shotNumber : 1);
-
   const handleDragStart = async (shotId: string | null, xh: number, yh: number, isExisting: boolean) => {
+    // If completed or limit reached for a new shot, do not allow adding new shots
+    if (!isExisting) {
+      if (isCompleted) return;
+      if (isLimited && committedCount >= limit!) return;
+    }
+
     const db = await openDB();
     const ep = await readEpoch(db);
     if (!isExisting) {
-      const draft = await createDraft(training.id, xh, yh, ep);
+      const draft = await createDraft(currentTraining.id, xh, yh, ep);
       setSelectedShotId(draft.id);
       setDragging({ shotId: draft.id, xh, yh, isNew: true });
       setShots(prev => [...prev, draft]);
@@ -96,9 +113,22 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     const db = await openDB();
     const ep = await readEpoch(db);
     const updated = await commitShot(dragging.shotId, xh, yh, ep);
-    setShots(prev => prev.map(s => s.id === updated.id ? updated : s).sort((a, b) => a.shotNumber - b.shotNumber));
+    const updatedShots = shots.map(s => s.id === updated.id ? updated : s);
+    if (!shots.some(s => s.id === updated.id)) {
+      updatedShots.push(updated);
+    }
+    updatedShots.sort((a, b) => a.shotNumber - b.shotNumber);
+    setShots(updatedShots);
     setSelectedShotId(updated.id);
     setDragging(null);
+
+    // If training has a limit and is not yet completed, check if limit is reached
+    const newCommittedCount = updatedShots.filter(s => s.status === 'committed').length;
+    if (shouldCompleteTrainingAfterShot(currentTraining, newCommittedCount)) {
+      const completed = await completeTraining(currentTraining.id, ep);
+      setCurrentTraining(completed);
+      setShowCompletedModal(true);
+    }
   };
 
   const handleDragCancel = async () => {
@@ -113,11 +143,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     setDragging(null);
   };
 
-   // Undo: delete the most recent shot (LIFO). Selection of the last-created
-   // shot happens in the domain (undoLastShot reads fresh shots from
-   // IndexedDB), so repeated clicks always target the current last shot
-   // without relying on stale React state. nextShotNumber is monotonic and is
-   // deliberately NOT decremented here.
+  // Undo: delete the most recent shot (LIFO).
   const canUndo = shots.length > 0 && dragging === null && !busy;
 
   const handleUndo = async () => {
@@ -126,12 +152,27 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     try {
       const db = await openDB();
       const ep = await readEpoch(db);
-      await undoLastShot(training.id, ep); // no-op when training has no shots
-      const updated = await listShots(training.id);
+      await undoLastShot(currentTraining.id, ep);
+      const updated = await listShots(currentTraining.id);
       setShots(updated);
       setSelectedShotId(prev => (prev && updated.some(s => s.id === prev) ? prev : null));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Create new training for the current athlete
+  const handleCreateNewTraining = async () => {
+    const db = await openDB();
+    const ep = await readEpoch(db);
+    const newT = await createTraining(athlete.id, ep);
+    setShowCompletedModal(false);
+    if (onNewTraining) {
+      onNewTraining(newT);
+    } else {
+      setCurrentTraining(newT);
+      setShots([]);
+      setSelectedShotId(null);
     }
   };
 
@@ -157,14 +198,14 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       }
     } else if (trimmed) {
       await createComment(
-        { athleteId: athlete.id, trainingId: training.id, shotId: commentModal.shotId, text: trimmed },
+        { athleteId: athlete.id, trainingId: currentTraining.id, shotId: commentModal.shotId, text: trimmed },
         ep,
       );
     }
     setCommentModal(null);
   };
 
-   // Toggle zoom mode cyclically
+  // Toggle zoom mode cyclically
   const toggleZoom = async () => {
     const currentIdx = ZOOM_MODES.indexOf(zoomMode);
     const next = ZOOM_MODES[(currentIdx + 1) % ZOOM_MODES.length];
@@ -172,12 +213,6 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
     const db = await openDB();
     await setSetting(db, 'targetZoomMode', next);
   };
-
-   // Confirm dialog content
-  const committedCount = shots.filter(s => s.status === 'committed').length;
-  const avgScore = committedCount > 0
-    ? (shots.filter(s => s.status === 'committed').reduce((sum, s) => sum + s.score, 0) / committedCount / 10)
-    : 0;
 
   if (loading) return <div style={s.page}><p>Загрузка…</p></div>;
 
@@ -187,8 +222,24 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
       <div style={s.header}>
         <button style={s.back} onClick={onBack}>◀ Назад</button>
         <span style={s.athleteName}>{athlete.name}</span>
-        <span style={s.shotNum}>№{shotNumber}</span>
+        <span style={s.shotNum}>
+          {isLimited ? `Выстрелы: ${committedCount} / ${limit}` : `Выстрелы: ${committedCount}`}
+        </span>
       </div>
+
+      {/* Completed notification banner */}
+      {isCompleted && (
+        <div style={s.completedBanner}>
+          <span style={s.completedBannerText}>Тренировка завершена</span>
+          <button
+            style={s.newTrainingBannerBtn}
+            onClick={handleCreateNewTraining}
+            aria-label="Новая тренировка"
+          >
+            + Новая тренировка
+          </button>
+        </div>
+      )}
 
       {/* Target */}
       <TargetCanvas
@@ -229,7 +280,41 @@ export default function TrainingScreen({ athlete, training, epoch, onBack }: Pro
         >
           💬
         </button>
+        {isCompleted && (
+          <button
+            style={s.newTrainingBtn}
+            onClick={handleCreateNewTraining}
+            aria-label="Новая тренировка"
+          >
+            + Новая
+          </button>
+        )}
       </div>
+
+      {/* Completed limit modal warning */}
+      {showCompletedModal && (
+        <div style={s.overlay}>
+          <div style={s.dialog}>
+            <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px', color: '#1a1a2e' }}>
+              Тренировка завершена
+            </p>
+            <p style={s.dialogInfo}>
+              Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
+            </p>
+            <div style={s.dialogBtns}>
+              <button style={s.btnGhost} onClick={() => setShowCompletedModal(false)}>
+                Просмотр
+              </button>
+              <button
+                style={s.btnPrimary}
+                onClick={handleCreateNewTraining}
+              >
+                + Новая тренировка
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comment modal */}
       {commentModal && (
@@ -266,14 +351,18 @@ const s: Record<string, React.CSSProperties> = {
   page:           { display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', userSelect: 'none' },
   header:         { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 4px', flexShrink: 0 },
   back:           { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', color: '#1a1a2e', padding: '4px 0' },
-  athleteName:    { fontSize: 16, fontWeight: 600, flex: 1 },
-  shotNum:        { fontSize: 16, color: '#666' },
+  athleteName:    { fontSize: 16, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  shotNum:        { fontSize: 14, color: '#666', whiteSpace: 'nowrap' },
   zoomToggle:     { background: 'none', border: '1px solid #ccc', borderRadius: 6, fontSize: 13, padding: '8px 10px', cursor: 'pointer', lineHeight: 1, textAlign: 'center' as const, flexShrink: 0, whiteSpace: 'nowrap' as const },
-  scoreDisplay: { textAlign: 'center', fontSize: 48, fontWeight: 700, padding: '4px 0', fontVariantNumeric: 'tabular-nums', color: '#1a1a2e', flexShrink: 0 },
+  scoreDisplay:   { textAlign: 'center', fontSize: 48, fontWeight: 700, padding: '4px 0', fontVariantNumeric: 'tabular-nums', color: '#1a1a2e', flexShrink: 0 },
+  completedBanner:{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', background: '#f0f2f5', borderBottom: '1px solid #e2e4e8', flexShrink: 0 },
+  completedBannerText: { fontSize: 13, fontWeight: 600, color: '#1a1a2e' },
+  newTrainingBannerBtn:{ padding: '4px 10px', fontSize: 13, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' as const },
   toolbar:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '8px 12px 16px', flexShrink: 0, boxSizing: 'border-box' as const },
   undoBtn:        { padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' as const },
   commentBtn:     { padding: '8px 10px', fontSize: 18, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
-  commentTextarea: { width: '100%', fontSize: 15, padding: '8px 10px', border: '1px solid #ccc', borderRadius: 6, boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'sans-serif' },
+  newTrainingBtn: { padding: '8px 10px', fontSize: 13, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' as const },
+  commentTextarea:{ width: '100%', fontSize: 15, padding: '8px 10px', border: '1px solid #ccc', borderRadius: 6, boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'sans-serif' },
   completeBtn:    { padding: '8px 16px', fontSize: 14, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer' },
   overlay:        { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
   dialog:         { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 320, width: '90%', textAlign: 'center' },
@@ -281,4 +370,5 @@ const s: Record<string, React.CSSProperties> = {
   dialogBtns:     { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 },
   btnGhost:       { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer' },
   btnDanger:      { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer' },
+  btnPrimary:     { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontWeight: 600 },
 };

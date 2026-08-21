@@ -1,10 +1,28 @@
 import { openDB } from '../db/open';
-import { readEpoch, withReadWrite } from '../db/tx';
+import { withReadWrite } from '../db/tx';
 import type { TrainingRecord, ShotRecord } from '../db/schema';
+
+/**
+ * Pure helper to check whether a training has reached its shot limit and should be completed.
+ */
+export function shouldCompleteTrainingAfterShot(
+  training: TrainingRecord,
+  committedShotCount: number,
+): boolean {
+  return (
+    typeof training.targetShotCount === 'number' &&
+    training.targetShotCount > 0 &&
+    !training.completedAt &&
+    committedShotCount >= training.targetShotCount
+  );
+}
+
+export const isTrainingLimitReached = shouldCompleteTrainingAfterShot;
 
 export async function createTraining(
   athleteId: string,
   clientEpoch: number,
+  targetShotCount: number | null = 10,
 ): Promise<TrainingRecord> {
   const db = await openDB();
   const now = new Date().toISOString();
@@ -15,6 +33,7 @@ export async function createTraining(
     updatedAt: now,
     completedAt: null,
     nextShotNumber: 1,
+    targetShotCount,
     };
   await withReadWrite(db, ['trainings'], clientEpoch, (tx) => new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
@@ -22,6 +41,32 @@ export async function createTraining(
     tx.objectStore('trainings').put(record);
   }));
   return record;
+}
+
+export async function completeTraining(
+  id: string,
+  clientEpoch: number,
+): Promise<TrainingRecord> {
+  const db = await openDB();
+  const now = new Date().toISOString();
+  let updated!: TrainingRecord;
+  await withReadWrite(db, ['trainings'], clientEpoch, (tx) => {
+    return new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      const req = tx.objectStore('trainings').get(id);
+      req.onsuccess = () => {
+        const tr = req.result as TrainingRecord | undefined;
+        if (!tr) { reject(new Error('Training not found')); return; }
+        tr.completedAt = now;
+        tr.updatedAt = now;
+        updated = tr;
+        tx.objectStore('trainings').put(tr);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  });
+  return updated;
 }
 
 export async function listTrainings(

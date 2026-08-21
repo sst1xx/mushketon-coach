@@ -63,7 +63,8 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
              <button style={s.itemTap} onClick={() => onSelectTraining(t)}>
                <div style={s.itemMain}>
                  <span style={s.date}>{formatDate(t.startedAt)}</span>
-                </div>
+                 {t.completedAt && <span style={s.badge}>Завершена</span>}
+               </div>
              </button>
              <div style={s.itemActions}>
                <button style={s.delBtn} onClick={() => setConfirmDelete(t)}>✕</button>

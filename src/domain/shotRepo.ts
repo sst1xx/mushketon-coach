@@ -1,5 +1,5 @@
 import { openDB } from '../db/open';
-import { readEpoch, withReadWrite } from '../db/tx';
+import { withReadWrite } from '../db/tx';
 import { score as recomputeScore } from '../scoring';
 import type { ShotRecord, TrainingRecord } from '../db/schema';
 
@@ -25,26 +25,48 @@ export async function createDraft(
       trGet.onsuccess = () => {
         const tr = trGet.result as TrainingRecord;
         if (!tr) { reject(new Error('Training not found')); return; }
-        const shotNumber = tr.nextShotNumber;
-        tr.nextShotNumber = shotNumber + 1;
-        tr.updatedAt = now;
-        tx.objectStore('trainings').put(tr);
-        shot = {
-          id: crypto.randomUUID(),
-          trainingId,
-          shotNumber,
-          x,
-          y,
-          score: recomputeScore(x, y),
-          status: 'draft',
-          createdAt: now,
-          updatedAt: now,
+        if (tr.completedAt) {
+          reject(new Error('Cannot add shot to a completed training'));
+          return;
+        }
+
+        const isLimited = typeof tr.targetShotCount === 'number' && tr.targetShotCount > 0;
+        if (isLimited) {
+          const countReq = tx.objectStore('shots').index('trainingId').count(trainingId);
+          countReq.onsuccess = () => {
+            if (countReq.result >= tr.targetShotCount!) {
+              reject(new Error('Training shot limit reached'));
+              return;
+            }
+            proceed();
+          };
+          countReq.onerror = () => reject(countReq.error);
+        } else {
+          proceed();
+        }
+
+        function proceed() {
+          const shotNumber = tr.nextShotNumber;
+          tr.nextShotNumber = shotNumber + 1;
+          tr.updatedAt = now;
+          tx.objectStore('trainings').put(tr);
+          shot = {
+            id: crypto.randomUUID(),
+            trainingId,
+            shotNumber,
+            x,
+            y,
+            score: recomputeScore(x, y),
+            status: 'draft',
+            createdAt: now,
+            updatedAt: now,
           } as ShotRecord;
-        tx.objectStore('shots').put(shot);
-        };
+          tx.objectStore('shots').put(shot);
+        }
+      };
       trGet.onerror = () => reject(trGet.error);
-      });
-      });
+    });
+  });
   return shot;
 }
 
