@@ -1,0 +1,9 @@
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  height: 100dvh;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}

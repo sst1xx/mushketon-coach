@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { openDB } from '../db/open';
 import { getSetting, setSetting } from '../db/settings';
 import { exportBackup, importBackup, validateBackup } from '../domain/backupService';
+import Modal from '../components/Modal';
+import s from './SettingsScreen.module.css';
 
 interface Props {
   onBack: () => void;
@@ -81,93 +83,72 @@ export default function SettingsScreen({ onBack }: Props) {
   };
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
-        <button style={s.back} onClick={onBack}>◀ Назад</button>
-        <span style={s.title}>Настройки</span>
+    <div className={s.page}>
+      <div className={s.header}>
+        <button className={s.back} onClick={onBack}>◀ Назад</button>
+        <span className={s.title}>Настройки</span>
       </div>
 
       {/* Section: Данные */}
-      <section style={s.section}>
-        <h3 style={s.sectionTitle}>Данные</h3>
-        <div style={s.divider} />
-        <button style={s.fullBtn} onClick={handleExport}>Сохранить резервную копию</button>
-        <button style={s.fullBtn} onClick={() => fileInputRef.current?.click()}>
+      <section className={s.section}>
+        <h3 className={s.sectionTitle}>Данные</h3>
+        <div className={s.divider} />
+        <button className={s.fullBtn} onClick={handleExport}>Сохранить резервную копию</button>
+        <button className={s.fullBtn} onClick={() => fileInputRef.current?.click()}>
           Восстановить из резервной копии
         </button>
         <input
           type="file"
           accept="application/json"
-          style={{ display: 'none' }}
+          className={s.hiddenInput}
           ref={fileInputRef}
           onChange={handleFileChange}
         />
       </section>
 
       {/* Section: Хранилище */}
-      <section style={s.section}>
-        <h3 style={s.sectionTitle}>Хранилище</h3>
+      <section className={s.section}>
+        <h3 className={s.sectionTitle}>Хранилище</h3>
         {storageInfo && (
-          <p style={s.info}>
+          <p className={s.info}>
             Использовано: {fmtBytes(storageInfo.usage)} из {fmtBytes(storageInfo.quota)}
           </p>
         )}
-        <p style={s.info}>
+        <p className={s.info}>
           Постоянное хранение:{' '}
           {storagePersisted === true ? 'Да' : storagePersisted === false ? 'Нет' : 'Неизвестно'}
         </p>
         {storagePersisted === false && (
-          <p style={s.warn}>
+          <p className={s.warn}>
             Браузер может удалить локальные данные при нехватке места. Регулярно сохраняйте резервную копию.
           </p>
         )}
       </section>
 
       {/* Section: Анализ */}
-      <section style={s.section}>
-        <h3 style={s.sectionTitle}>Анализ</h3>
-        <div style={s.divider} />
-        <p style={s.info}>В разработке</p>
+      <section className={s.section}>
+        <h3 className={s.sectionTitle}>Анализ</h3>
+        <div className={s.divider} />
+        <p className={s.info}>В разработке</p>
       </section>
 
       {/* Status message */}
-      {status && <p style={s.status}>{status}</p>}
+      {status && <p className={s.status}>{status}</p>}
 
       {/* Confirm restore dialog */}
-      {confirmRestore !== null && (
-        <div style={s.overlay}>
-          <div style={s.dialog}>
-            <p>Восстановить резервную копию?</p>
-            <p style={s.dialogInfo}>
-              Текущие данные будут заменены данными из выбранной копии.
-            </p>
-            <div style={s.dialogBtns}>
-              <button style={s.btnGhost} onClick={() => setConfirmRestore(null)}>Отмена</button>
-              <button style={s.btnDanger} onClick={handleRestoreConfirm}>Восстановить</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={confirmRestore !== null}
+        onClose={() => setConfirmRestore(null)}
+        actions={[
+          { label: 'Отмена', onClick: () => setConfirmRestore(null) },
+          { label: 'Восстановить', danger: true, onClick: handleRestoreConfirm },
+        ]}
+      >
+        <p>Восстановить резервную копию?</p>
+        <p className={s.dialogInfo}>
+          Текущие данные будут заменены данными из выбранной копии.
+        </p>
+      </Modal>
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  page:       { maxWidth: 480, margin: '0 auto', padding: '16px 16px 32px', fontFamily: 'sans-serif' },
-  header:     { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 },
-  back:       { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', color: '#1a1a2e', padding: '4px 0' },
-  title:      { fontSize: 20, fontWeight: 600 },
-  section:    { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, color: '#555', margin: '0 0 8px' },
-  divider:    { height: 1, background: '#eee', margin: '8px 0 16px' },
-  fullBtn:    { display: 'block', width: '100%', padding: '12px', fontSize: 15, borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer', textAlign: 'left', marginBottom: 8 },
-  info:       { fontSize: 14, color: '#333', margin: '4px 0' },
-  warn:       { fontSize: 13, color: '#c0392b', margin: '8px 0', lineHeight: 1.4 },
-  status:     { fontSize: 14, color: '#27ae60', marginTop: 16, textAlign: 'center' },
-  overlay:    { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  dialog:     { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 320, width: '90%', textAlign: 'center' },
-  dialogInfo: { color: '#555', fontSize: 14, margin: '8px 0 0' },
-  dialogBtns: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 },
-  btnGhost:   { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer' },
-  btnDanger:  { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer' },
-};

@@ -23,6 +23,15 @@ import {
   updateComment,
   deleteComment,
 } from '../domain/commentRepo';
+import Modal from '../components/Modal';
+import { useWakeLock } from '../utils/useWakeLock';
+import s from './TrainingScreen.module.css';
+
+const ZOOM_LABELS: Record<'full' | 'zoom7' | 'zoom9', string> = {
+  full: '🎯 1-10',
+  zoom7: '🔍 7-10',
+  zoom9: '🔬 9-10',
+};
 
 interface Props {
   athlete: AthleteRecord;
@@ -49,6 +58,17 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const [commentText, setCommentText] = useState('');
   // Completed limit warning modal
   const [showCompletedModal, setShowCompletedModal] = useState(false);
+  // Commit confirmation toast ("№N • 10.4") shown briefly after each committed shot
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Keep the screen awake while the training screen is open (active series).
+  useWakeLock(true);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 1200);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Load shots and settings on mount / training switch
   useEffect(() => {
@@ -121,6 +141,11 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     setShots(updatedShots);
     setSelectedShotId(updated.id);
     setDragging(null);
+
+    // Haptic + toast confirmation feedback on commit.
+    navigator.vibrate?.(15);
+    const scoreLabel = updated.score > 0 ? (updated.score / 10).toFixed(1) : '0.0';
+    setToast(`№${updated.shotNumber} • ${scoreLabel}`);
 
     // If training has a limit and is not yet completed, check if limit is reached
     const newCommittedCount = updatedShots.filter(s => s.status === 'committed').length;
@@ -214,25 +239,25 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     await setSetting(db, 'targetZoomMode', next);
   };
 
-  if (loading) return <div style={s.page}><p>Загрузка…</p></div>;
+  if (loading) return <div className={s.page}><p>Загрузка…</p></div>;
 
   return (
-    <div style={s.page}>
+    <div className={s.page}>
       {/* Header */}
-      <div style={s.header}>
-        <button style={s.back} onClick={onBack}>◀ Назад</button>
-        <span style={s.athleteName}>{athlete.name}</span>
-        <span style={s.shotNum}>
+      <div className={s.header}>
+        <button className={s.back} onClick={onBack}>◀ Назад</button>
+        <span className={s.athleteName}>{athlete.name}</span>
+        <span className={s.shotNum}>
           {isLimited ? `Выстрелы: ${committedCount} / ${limit}` : `Выстрелы: ${committedCount}`}
         </span>
       </div>
 
       {/* Completed notification banner */}
       {isCompleted && (
-        <div style={s.completedBanner}>
-          <span style={s.completedBannerText}>Тренировка завершена</span>
+        <div className={s.completedBanner}>
+          <span className={s.completedBannerText}>Тренировка завершена</span>
           <button
-            style={s.newTrainingBannerBtn}
+            className={s.newTrainingBannerBtn}
             onClick={handleCreateNewTraining}
             aria-label="Новая тренировка"
           >
@@ -241,39 +266,42 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         </div>
       )}
 
-      {/* Target */}
-      <TargetCanvas
-        shots={shots}
-        dragging={dragging}
-        selectedShotId={selectedShotId}
-        zoomMode={zoomMode}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      />
+      {/* Target + commit confirmation toast */}
+      <div className={s.targetWrap}>
+        <TargetCanvas
+          shots={shots}
+          dragging={dragging}
+          selectedShotId={selectedShotId}
+          zoomMode={zoomMode}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        />
+        {toast && <div className={s.toast}>{toast}</div>}
+      </div>
 
       {/* Score */}
-      <div style={s.scoreDisplay}>{displayScore}</div>
+      <div className={s.scoreDisplay}>{displayScore}</div>
 
       {/* Bottom toolbar */}
-      <div style={s.toolbar}>
+      <div className={s.toolbar}>
         <button
-          style={{ ...s.undoBtn, opacity: canUndo ? 1 : 0.4 }}
+          className={`${s.undoBtn} ${canUndo ? '' : s.disabled}`}
           onClick={handleUndo}
           disabled={!canUndo}
         >
           Отменить последний
         </button>
         <button
-          style={s.zoomToggle}
+          className={s.zoomToggle}
           onClick={toggleZoom}
           aria-label="Масштаб"
         >
-          Масштаб
+          {ZOOM_LABELS[zoomMode]}
         </button>
         <button
-          style={{ ...s.commentBtn, opacity: targetShot && dragging === null ? 1 : 0.4 }}
+          className={`${s.commentBtn} ${targetShot && dragging === null ? '' : s.disabled}`}
           onClick={handleOpenComment}
           disabled={!targetShot || dragging !== null}
           aria-label="Добавить замечание"
@@ -282,7 +310,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         </button>
         {isCompleted && (
           <button
-            style={s.newTrainingBtn}
+            className={s.newTrainingBtn}
             onClick={handleCreateNewTraining}
             aria-label="Новая тренировка"
           >
@@ -292,83 +320,44 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       </div>
 
       {/* Completed limit modal warning */}
-      {showCompletedModal && (
-        <div style={s.overlay}>
-          <div style={s.dialog}>
-            <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px', color: '#1a1a2e' }}>
-              Тренировка завершена
-            </p>
-            <p style={s.dialogInfo}>
-              Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
-            </p>
-            <div style={s.dialogBtns}>
-              <button style={s.btnGhost} onClick={() => setShowCompletedModal(false)}>
-                Просмотр
-              </button>
-              <button
-                style={s.btnPrimary}
-                onClick={handleCreateNewTraining}
-              >
-                + Новая тренировка
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showCompletedModal}
+        onClose={() => setShowCompletedModal(false)}
+        actions={[
+          { label: 'Просмотр', onClick: () => setShowCompletedModal(false) },
+          { label: '+ Новая тренировка', onClick: handleCreateNewTraining },
+        ]}
+      >
+        <p className={s.dialogHeading}>Тренировка завершена</p>
+        <p className={s.dialogInfo}>
+          Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
+        </p>
+      </Modal>
 
       {/* Comment modal */}
-      {commentModal && (
-        <div style={s.overlay}>
-          <div style={s.dialog}>
-            <p style={s.dialogInfo}>Замечание к выстрелу №{commentModal.shotNumber}</p>
-            <textarea
-              style={s.commentTextarea}
-              value={commentText}
-              onChange={e => setCommentText(e.target.value)}
-              rows={4}
-              maxLength={1000}
-              autoFocus
-              placeholder="Введите замечание…"
-            />
-            <div style={s.dialogBtns}>
-              <button style={s.btnGhost} onClick={() => setCommentModal(null)}>Отмена</button>
-              <button
-                style={{ ...s.btnDanger, background: '#1a1a2e', opacity: (commentText.trim() || commentModal.existingCommentId) ? 1 : 0.5 }}
-                onClick={handleSaveComment}
-                disabled={!commentText.trim() && !commentModal.existingCommentId}
-              >
-                Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={commentModal !== null}
+        onClose={() => setCommentModal(null)}
+        actions={[
+          { label: 'Отмена', onClick: () => setCommentModal(null) },
+          {
+            label: 'Сохранить',
+            onClick: handleSaveComment,
+            disabled: !commentText.trim() && !commentModal?.existingCommentId,
+          },
+        ]}
+      >
+        <p className={s.dialogInfo}>Замечание к выстрелу №{commentModal?.shotNumber}</p>
+        <textarea
+          className={s.commentTextarea}
+          value={commentText}
+          onChange={e => setCommentText(e.target.value)}
+          rows={4}
+          maxLength={1000}
+          autoFocus
+          placeholder="Введите замечание…"
+        />
+      </Modal>
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  page:           { display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden', userSelect: 'none' },
-  header:         { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px 4px', flexShrink: 0 },
-  back:           { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', color: '#1a1a2e', padding: '4px 0' },
-  athleteName:    { fontSize: 16, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  shotNum:        { fontSize: 14, color: '#666', whiteSpace: 'nowrap' },
-  zoomToggle:     { background: 'none', border: '1px solid #ccc', borderRadius: 6, fontSize: 13, padding: '8px 10px', cursor: 'pointer', lineHeight: 1, textAlign: 'center' as const, flexShrink: 0, whiteSpace: 'nowrap' as const },
-  scoreDisplay:   { textAlign: 'center', fontSize: 48, fontWeight: 700, padding: '4px 0', fontVariantNumeric: 'tabular-nums', color: '#1a1a2e', flexShrink: 0 },
-  completedBanner:{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', background: '#f0f2f5', borderBottom: '1px solid #e2e4e8', flexShrink: 0 },
-  completedBannerText: { fontSize: 13, fontWeight: 600, color: '#1a1a2e' },
-  newTrainingBannerBtn:{ padding: '4px 10px', fontSize: 13, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' as const },
-  toolbar:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '8px 12px 16px', flexShrink: 0, boxSizing: 'border-box' as const },
-  undoBtn:        { padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' as const },
-  commentBtn:     { padding: '8px 10px', fontSize: 18, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer', lineHeight: 1, flexShrink: 0 },
-  newTrainingBtn: { padding: '8px 10px', fontSize: 13, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' as const },
-  commentTextarea:{ width: '100%', fontSize: 15, padding: '8px 10px', border: '1px solid #ccc', borderRadius: 6, boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'sans-serif' },
-  completeBtn:    { padding: '8px 16px', fontSize: 14, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer' },
-  overlay:        { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  dialog:         { background: '#fff', borderRadius: 12, padding: 24, maxWidth: 320, width: '90%', textAlign: 'center' },
-  dialogInfo:     { color: '#555', fontSize: 15, margin: '4px 0' },
-  dialogBtns:     { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 },
-  btnGhost:       { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: '1px solid #ccc', background: 'none', cursor: 'pointer' },
-  btnDanger:      { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer' },
-  btnPrimary:     { padding: '8px 16px', fontSize: 15, borderRadius: 6, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontWeight: 600 },
-};
