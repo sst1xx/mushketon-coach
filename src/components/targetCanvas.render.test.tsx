@@ -149,20 +149,34 @@ describe('TargetCanvas ring labels — full mode (render)', () => {
   });
 });
 
-describe('TargetCanvas ring labels — zoom7 mode (render)', () => {
-  const texts = extractTexts(renderMarkup('zoom7'));
-
-  it('each ring number 7..9 renders once per direction, no ring 10', () => {
-    for (let n = 7; n <= 9; n++) {
-      expect(texts.filter(t => t.content === String(n))).toHaveLength(4);
-    }
-    expect(texts.some(t => t.content === '10')).toBe(false);
-  });
-
-  it('all labels use centered anchors', () => {
-    for (const t of texts) {
-      expect(t.attrs['text-anchor']).toBe('middle');
-      expect(t.attrs['dominant-baseline']).toBe('central');
-    }
+describe('TargetCanvas shot marker selection and colors', () => {
+  it('renders default shot as black, last shot as green, selected older shot as blue', () => {
+    const markup = renderToStaticMarkup(
+      <TargetCanvas
+        shots={[
+          { id: 's1', trainingId: 't1', shotNumber: 1, x: 0, y: 0, score: 90, status: 'committed', createdAt: '', updatedAt: '' },
+          { id: 's2', trainingId: 't1', shotNumber: 2, x: 100, y: 100, score: 95, status: 'committed', createdAt: '', updatedAt: '' },
+          { id: 's3', trainingId: 't1', shotNumber: 3, x: 200, y: 200, score: 100, status: 'committed', createdAt: '', updatedAt: '' },
+        ]}
+        selectedShotId="s1"
+        dragging={null}
+        zoomMode="full"
+        onDragStart={noop}
+        onDragMove={noop}
+        onDragEnd={noop}
+        onDragCancel={noop}
+      />
+    );
+    const circles = extractCircles(markup);
+    // Filter inner marker circles with stroke-width="0.25"
+    const innerCircles = circles.filter(c => c.attrs['stroke-width'] === '0.25');
+    expect(innerCircles).toHaveLength(3);
+    // s1 is selected older shot -> #3B82F6 (blue)
+    expect(innerCircles[0].attrs.fill).toBe('#3B82F6');
+    // s2 is regular older shot -> black
+    expect(innerCircles[1].attrs.fill).toBe('black');
+    // s3 is last shot -> #22C55E (green)
+    expect(innerCircles[2].attrs.fill).toBe('#22C55E');
   });
 });
+

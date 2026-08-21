@@ -4,6 +4,7 @@ import {
    TrainingRecord,
    ShotRecord,
    SettingsRecord,
+   CommentRecord,
    STORES,
   } from '../db/schema';
 import { score as recomputeScore, SCORING_VERSION } from '../scoring';
@@ -24,6 +25,7 @@ export interface BackupFile {
   athletes: AthleteRecord[];
   trainings: TrainingRecord[];
   shots: ShotRecord[];
+  comments: CommentRecord[];
   settings: BackupSettings;
 }
 
@@ -34,14 +36,16 @@ export async function exportBackup(): Promise<BackupFile> {
   let athletes: AthleteRecord[] = [];
   let trainings: TrainingRecord[] = [];
   let shots: ShotRecord[] = [];
+  let comments: CommentRecord[] = [];
   let settings!: BackupSettings;
 
-  // One readonly transaction over all 4 stores
+  // One readonly transaction over all 5 stores
   await new Promise<void>((resolve, reject) => {
      const tx = db.transaction([
         STORES.ATHLETES,
         STORES.TRAININGS,
         STORES.SHOTS,
+        STORES.COMMENTS,
         STORES.SETTINGS,
        ], 'readonly');
    tx.oncomplete = () => resolve();
@@ -60,6 +64,10 @@ export async function exportBackup(): Promise<BackupFile> {
       sReq.onsuccess = () => { shots = sReq.result as ShotRecord[]; };
      sReq.onerror = () => reject(sReq.error);
 
+      const cReq = tx.objectStore(STORES.COMMENTS).getAll();
+      cReq.onsuccess = () => { comments = cReq.result as CommentRecord[]; };
+      cReq.onerror = () => reject(cReq.error);
+
       const stReq = tx.objectStore(STORES.SETTINGS).getAll();
       stReq.onsuccess = () => {
           const recs = stReq.result as SettingsRecord[];
@@ -75,14 +83,19 @@ export async function exportBackup(): Promise<BackupFile> {
      stReq.onerror = () => reject(stReq.error);
      });
 
-  // Only committed shots in the export
   const committed = shots.filter((s) => s.status === 'committed');
+  // Only committed shots in the export
+  // Retain comments whose shotId references an exported (committed) shot
+  const committedIds = new Set(committed.map((s) => s.id));
+  const exportedComments = comments.filter((c) => committedIds.has(c.shotId));
+
   const data: BackupFile = {
     version: 1,
     exportedAt: new Date().toISOString(),
     athletes,
     trainings,
     shots: committed,
+    comments: exportedComments,
     settings,
       };
 
@@ -126,6 +139,10 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
     throw new Error('trainings must be an array');
   if (!Array.isArray(file.shots))
     throw new Error('shots must be an array');
+  // comments is optional for backward compat; default to []
+  if (file.comments !== undefined && !Array.isArray(file.comments))
+    throw new Error('comments must be an array');
+  const comments: CommentRecord[] = file.comments ?? [];
   if (typeof file.settings !== 'object' || file.settings === null)
     throw new Error('settings must be an object');
 
@@ -186,6 +203,19 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
       throw new Error(`Non-committed shot in backup: ${s.id}`);
      }
 
+  // validate comments
+  const shotIdSet = new Set((file.shots as ShotRecord[]).map((s: ShotRecord) => s.id));
+  for (const c of comments) {
+    if (typeof c.id !== 'string' || c.id.length === 0)
+      throw new Error(`Invalid comment id: ${c.id}`);
+    if (typeof c.shotId !== 'string' || !shotIdSet.has(c.shotId))
+      throw new Error(`Comment references unknown shot: ${c.id}`);
+    if (typeof c.text !== 'string')
+      throw new Error(`Invalid comment text: ${c.id}`);
+    if (!isISO(c.createdAt) || !isISO(c.updatedAt))
+      throw new Error(`Invalid comment time: ${c.id}`);
+  }
+
   // 5. No duplicate ids across all 3 stores
   const allIds = new Set<string>();
   for (const a of file.athletes as AthleteRecord[]) {
@@ -200,6 +230,10 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
     if (allIds.has(s.id)) throw new Error(`Duplicate id: shot ${s.id}`);
     allIds.add(s.id);
      }
+  for (const c of comments) {
+    if (allIds.has(c.id)) throw new Error(`Duplicate id: comment ${c.id}`);
+    allIds.add(c.id);
+  }
 
   // 4. Referential integrity
   const athleteIdSet = new Set((file.athletes as AthleteRecord[]).map((a) => a.id));
@@ -269,7 +303,7 @@ export async function importBackup(data: unknown): Promise<void> {
     // 4. One readwrite tx: clear all, fill, set settings
     await new Promise<void>((resolve, reject) => {
        const tx = db.transaction(
-         [STORES.ATHLETES, STORES.TRAININGS, STORES.SHOTS, STORES.SETTINGS],
+         [STORES.ATHLETES, STORES.TRAININGS, STORES.SHOTS, STORES.COMMENTS, STORES.SETTINGS],
           'readwrite',
        );
       tx.oncomplete = () => resolve();
@@ -283,6 +317,7 @@ export async function importBackup(data: unknown): Promise<void> {
       clearAll(STORES.ATHLETES);
       clearAll(STORES.TRAININGS);
       clearAll(STORES.SHOTS);
+      clearAll(STORES.COMMENTS);
       clearAll(STORES.SETTINGS);
 
       // Populate
@@ -292,6 +327,8 @@ export async function importBackup(data: unknown): Promise<void> {
         s.score = recomputeScore(s.x, s.y); // recalculate, ignore stored score
         tx.objectStore(STORES.SHOTS).put(s);
          }
+      const fileComments: CommentRecord[] = (file as any).comments ?? [];
+      for (const c of fileComments) tx.objectStore(STORES.COMMENTS).put(c);
       tx.objectStore(STORES.SETTINGS).put({ key: 'SCORING_VERSION' as const, value: SCORING_VERSION });
       tx.objectStore(STORES.SETTINGS).put({ key: 'dataEpoch' as const, value: newEpoch });
       tx.objectStore(STORES.SETTINGS).put({ key: 'storagePersisted' as const, value: file.settings.storagePersisted });

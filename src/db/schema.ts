@@ -34,6 +34,16 @@ export interface ShotRecord {
   updatedAt: string;
 }
 
+export interface CommentRecord {
+  id: string;
+  athleteId: string;
+  trainingId: string;
+  shotId: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt' | 'targetZoomMode';
 
 export interface SettingsRecord {
@@ -42,11 +52,12 @@ export interface SettingsRecord {
 }
 
 export const DB_NAME = 'musketoon-coach';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORES = {
   ATHLETES: 'athletes',
   TRAININGS: 'trainings',
   SHOTS: 'shots',
   SETTINGS: 'settings',
+  COMMENTS: 'comments',
 } as const;

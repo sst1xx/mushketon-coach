@@ -46,6 +46,14 @@ function upgrade(db: IDBDatabase, oldVersion: number) {
     sh.createIndex('trainingId', 'trainingId', { unique: false });
     db.createObjectStore('settings', { keyPath: 'key' });
   }
+  if (oldVersion < 2) {
+    if (!db.objectStoreNames.contains('comments')) {
+      const cm = db.createObjectStore('comments', { keyPath: 'id' });
+      cm.createIndex('athleteId', 'athleteId', { unique: false });
+      cm.createIndex('trainingId', 'trainingId', { unique: false });
+      cm.createIndex('shotId', 'shotId', { unique: false });
+    }
+  }
 }
 
 export class DBVersionTooNewError extends Error {

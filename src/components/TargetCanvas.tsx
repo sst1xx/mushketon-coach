@@ -79,6 +79,7 @@ const LABEL_DIRS: Array<[number, number]> = [
 interface Props {
   shots: ShotRecord[];
   dragging: { shotId: string; xh: number; yh: number } | null;
+  selectedShotId?: string | null;
   zoomMode: ZoomMode;
   onDragStart: (shotId: string | null, xh: number, yh: number, isExisting: boolean) => void;
   onDragMove: (xh: number, yh: number) => void;
@@ -89,6 +90,7 @@ interface Props {
 export default function TargetCanvas({
   shots,
   dragging,
+  selectedShotId,
   zoomMode,
   onDragStart,
   onDragMove,
@@ -303,10 +305,11 @@ export default function TargetCanvas({
 
           const isLast = lastShot !== null && shot.id === lastShot.id;
           const isDragging = dragging !== null && dragging.shotId === shot.id;
-          const emphasis = isDragging || isLast;
+          const isSelected = selectedShotId !== null && selectedShotId !== undefined && shot.id === selectedShotId && !isLast;
+          const emphasis = isDragging || isLast || isSelected;
 
           const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
-          const fillColor = emphasis ? '#22C55E' : 'black';
+          const fillColor = isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black';
           const strokeColor = 'white';
           const textFill = 'white';
 

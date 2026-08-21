@@ -92,16 +92,66 @@ describe('IndexedDB persistence layer', () => {
      });
 
     // ── 1: schema ──
-  it('all 4 stores exist; shots has trainingId index; trainings has athleteId index', async () => {
+  it('all 5 stores exist; shots has trainingId index; trainings has athleteId index; comments has indices', async () => {
     expect(db.objectStoreNames.contains('athletes')).toBe(true);
     expect(db.objectStoreNames.contains('trainings')).toBe(true);
     expect(db.objectStoreNames.contains('shots')).toBe(true);
+    expect(db.objectStoreNames.contains('comments')).toBe(true);
     expect(db.objectStoreNames.contains('settings')).toBe(true);
     const shotsStore = db.transaction('shots', 'readonly').objectStore('shots');
     expect(shotsStore.indexNames.contains('trainingId')).toBe(true);
     const trainingsStore = db.transaction('trainings', 'readonly').objectStore('trainings');
     expect(trainingsStore.indexNames.contains('athleteId')).toBe(true);
-     });
+    const commentsStore = db.transaction('comments', 'readonly').objectStore('comments');
+    expect(commentsStore.indexNames.contains('athleteId')).toBe(true);
+    expect(commentsStore.indexNames.contains('trainingId')).toBe(true);
+    expect(commentsStore.indexNames.contains('shotId')).toBe(true);
+  });
+
+  // ── 1b: migration v1 -> v2 preserves data and creates comments store ──
+  it('migrates from v1 to v2 preserving existing data and creating comments store', async () => {
+    closeDB();
+    // Delete database to set up a pure v1 DB manually
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('musketoon-coach');
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+
+    // Create v1 DB and insert data
+    const dbV1 = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('musketoon-coach', 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        d.createObjectStore('athletes', { keyPath: 'id' });
+        const tr = d.createObjectStore('trainings', { keyPath: 'id' });
+        tr.createIndex('athleteId', 'athleteId', { unique: false });
+        const sh = d.createObjectStore('shots', { keyPath: 'id' });
+        sh.createIndex('trainingId', 'trainingId', { unique: false });
+        d.createObjectStore('settings', { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    await mkAthlete(dbV1, 'a-old', 'Old Athlete');
+    await mkTraining(dbV1, 't-old', 'a-old');
+    await mkShot(dbV1, 's-old', 't-old', 100, 200, 105, 'committed');
+    dbV1.close();
+
+    // Now open via openDB() which targets DB_VERSION (2)
+    const dbV2 = await openDB();
+    expect(dbV2.version).toBe(2);
+    expect(dbV2.objectStoreNames.contains('comments')).toBe(true);
+
+    // Existing data preserved
+    expect(await countStore(dbV2, 'athletes')).toBe(1);
+    expect(await countStore(dbV2, 'trainings')).toBe(1);
+    expect(await countStore(dbV2, 'shots')).toBe(1);
+    const shot = await getShot(dbV2, 's-old');
+    expect(shot).toBeDefined();
+    expect(shot.score).toBe(105);
+  });
 
     // ── 2: initSettings idempotent ──
   it('initSettings is idempotent (calling twice leaves correct values)', async () => {

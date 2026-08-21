@@ -8,11 +8,13 @@ import AthletesScreen from './screens/AthletesScreen';
 import TrainingsScreen from './screens/TrainingsScreen';
 import TrainingScreen from './screens/TrainingScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import RemarksScreen from './screens/RemarksScreen';
 
 type Screen = 
   | { name: 'athletes' }
   | { name: 'trainings'; athlete: AthleteRecord }
   | { name: 'training'; athlete: AthleteRecord; training: TrainingRecord }
+  | { name: 'remarks'; athlete: AthleteRecord }
   | { name: 'settings' };
 
 export default function App() {
@@ -53,6 +55,15 @@ export default function App() {
       <SettingsScreen onBack={() => setScreen({ name: 'athletes' })} />
     );
   }
+  if (screen.name === 'remarks') {
+    return (
+      <RemarksScreen
+        athlete={screen.athlete}
+        epoch={epoch}
+        onBack={() => setScreen({ name: 'trainings', athlete: screen.athlete })}
+      />
+    );
+  }
   if (screen.name === 'trainings') {
     return (
       <TrainingsScreen
@@ -60,6 +71,7 @@ export default function App() {
         epoch={epoch}
         onBack={() => setScreen({ name: 'athletes' })}
         onSelectTraining={(training) => setScreen({ name: 'training', athlete: screen.athlete, training })}
+        onOpenRemarks={() => setScreen({ name: 'remarks', athlete: screen.athlete })}
       />
     );
   }

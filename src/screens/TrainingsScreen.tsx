@@ -9,9 +9,10 @@ interface Props {
   epoch: number;
   onBack: () => void;
   onSelectTraining: (t: TrainingRecord) => void;
+  onOpenRemarks?: () => void;
 }
 
-export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining }: Props) {
+export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining, onOpenRemarks }: Props) {
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
@@ -50,6 +51,9 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
        <div style={s.header}>
          <button style={s.back} onClick={onBack}>◀ Назад</button>
          <span style={s.athleteName}>{athlete.name}</span>
+         {onOpenRemarks && (
+           <button style={s.remarksBtn} onClick={onOpenRemarks}>Замечания</button>
+         )}
        </div>
        <h2 style={s.title}>Тренировки</h2>
 
@@ -90,7 +94,8 @@ const s: Record<string, React.CSSProperties> = {
    page:        { maxWidth: 480, margin: '0 auto', padding: '16px 16px 32px', fontFamily: 'sans-serif' },
   header:      { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 },
   back:         { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', color: '#1a1a2e', padding: '4px 0' },
-  athleteName: { fontSize: 17, fontWeight: 600 },
+  athleteName: { fontSize: 17, fontWeight: 600, flex: 1 },
+  remarksBtn:  { background: 'none', border: '1px solid #ccc', borderRadius: 6, fontSize: 13, padding: '4px 10px', cursor: 'pointer', color: '#1a1a2e' },
   title:        { fontSize: 22, margin: '0 0 16px' },
   list:         { listStyle: 'none', padding: 0, margin: '0 0 16px' },
   item:         { display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #eee', padding: '10px 0' },
