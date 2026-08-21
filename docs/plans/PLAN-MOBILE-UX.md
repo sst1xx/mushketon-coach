@@ -355,6 +355,25 @@ npx vitest run
 - **Где фиксируется:** результат вносится как секция «Manual QA sign-off» в отчёт `worker`/`reviewer` по фазе (дата, устройство/эмулятор, кто проверял, отметка по каждой строке §6.3: pass/fail) и дублируется одной строкой в `docs/plans/PLAN-MOBILE-UX.md` в подразделе фазы (например, «Фаза 1 — manual QA: approved by <имя>, <дата>»).
 - **Блокирующее правило:** фаза, содержащая DOM wiring/manual-acceptance пункты (Modal, Wake Lock, лупа, скролл, safe-area, touch targets, PWA installability), не считается завершённой и не открывает следующую фазу без записанного sign-off. Это не блокирует прохождение и приёмку самих чистых Node unit-тестов — они остаются самостоятельным критерием, независимым от manual QA gate.
 
+### 6.5 Manual QA sign-off — Фазы 0–4
+
+**Тестировано:** пользователем (владельцем продукта) на production preview deploy (Cloudflare Pages, ветка `mobile-ux`).
+**Устройство:** iOS (Safari, реальное устройство).
+**Контекст:** проверка после деплоя preview-версии на Cloudflare Pages, перед merge в `main`.
+
+Проверенные сценарии (§6.3):
+- PWA install (iOS Safari, Add to Home Screen, standalone запуск) — PASS
+- Safe-area и скролл экранов (списки, тулбар, home indicator) — PASS
+- Touch targets 44×44px (кнопки удаления, плотные списки) — PASS
+- Modal / экранная клавиатура (открытие, ввод, закрытие) — PASS
+- Loupe / точный ввод попадания (drag, точность десятых) — PASS
+- Wake Lock (удержание экрана на экране тренировки) — PASS
+- Offline cold start (установленное PWA, отключённая сеть) — PASS
+
+**Android:** явно пропущен по решению пользователя (не входит в объём приёмки этого плана).
+
+**Итог:** ✅ APPROVED — iOS QA пройден, Android QA пропущен по явному решению владельца продукта. Manual QA gate (§6.4) закрыт для Фаз 0–4.
+
 ---
 
 ## 7. Процесс выполнения, единый worktree и приёмка через пользовательский commit (Execution & Acceptance Strategy)
