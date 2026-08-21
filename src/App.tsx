@@ -9,6 +9,7 @@ import TrainingsScreen from './screens/TrainingsScreen';
 import TrainingScreen from './screens/TrainingScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import RemarksScreen from './screens/RemarksScreen';
+import styles from './App.module.css';
 
 type Screen = 
   | { name: 'athletes' }
@@ -38,8 +39,8 @@ export default function App() {
     })();
   }, []);
 
-  if (error) return <div style={styles.center}><p>{error}</p></div>;
-  if (!ready) return <div style={styles.center}><p>Загрузка…</p></div>;
+  if (error) return <div className={styles.center}><p>{error}</p></div>;
+  if (!ready) return <div className={styles.center}><p>Загрузка…</p></div>;
 
   if (screen.name === 'athletes') {
     return (
@@ -88,7 +89,3 @@ export default function App() {
   }
   return null;
 }
-
-const styles = {
-  center: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' } as React.CSSProperties,
-};

@@ -1,11 +1,17 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { screenToTarget, targetToScreen } from '../transform';
 import type { ShotRecord } from '../db/schema';
+import TargetLoupe from './TargetLoupe';
+import styles from './TargetCanvas.module.css';
 
 const VIEW = 160; // viewBox size, 1 unit = 1mm
 const CENTER = VIEW / 2; // 80
 const SVG_TARGET_RECT = { left: 0, top: 0, width: VIEW, height: VIEW };
 const HIT_RADIUS_PX = 24;
+// Loupe crop window (viewBox units); paired with the loupe's own on-screen
+// box size (see TargetLoupe.module.css .loupe) to approximate ~2.5x visual
+// magnification relative to the main canvas.
+const LOUPE_CROP_SIZE = VIEW / 2.5;
 
 // Ring boundary diameters (mm)
 const RING_D: Record<number, number> = {
@@ -99,19 +105,6 @@ export default function TargetCanvas({
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState(0);
-
-  // ResizeObserver to determine the square size that fits the container
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      setSize(Math.min(width, height));
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   // Zoom scale: makes the zoomed zone fill the full 80-unit radius of the viewBox
   const isZoom7 = zoomMode === 'zoom7';
@@ -215,121 +208,135 @@ export default function TargetCanvas({
   const labelFont = isZoom7 ? LABEL_FONT_ZOOM7 : isZoom9 ? LABEL_FONT_ZOOM9 : LABEL_FONT_FULL;
   const ringLabels = computeRingLabels(zoomMode);
 
+  // Ring geometry, shared unmodified between the main canvas and the loupe HUD.
+  const ringElements = (
+    <>
+      {/* 1. White background — always full viewBox radius */}
+      <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
+
+      {/* 2. Black zone: solid black circle up to ring-7 boundary (scaled for zoom) */}
+      <circle cx={CENTER} cy={CENTER}
+        r={(isZoom9 ? RING_D[9] : RING_D[7]) / 2 * ZOOM_SCALE} fill="black" />
+
+      {/* 3. Ring boundary lines (radii scaled by ZOOM_SCALE) */}
+      {isZoom7 || isZoom9 ? (
+        <>
+          {/* Zoomed views: outer boundary is the selected ring, with inner rings shown. */}
+          {(isZoom7 ? [8, 9] : [10]).map(n => (
+            <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2 * ZOOM_SCALE}
+              fill="none" stroke="white" strokeWidth={0.3} />
+          ))}
+          <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2 * ZOOM_SCALE}
+            fill="none" stroke="white" strokeWidth={0.3} />
+          <circle cx={CENTER} cy={CENTER} r={2.5 * ZOOM_SCALE} fill="white" />
+        </>
+      ) : (
+        <>
+          {/* Full: outer rings 1-6 (black stroke on white), inner 8-9 (white stroke on black) */}
+          {([1, 2, 3, 4, 5, 6] as const).map(n => (
+            <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
+              fill="none" stroke="#333" strokeWidth={0.3} />
+          ))}
+          {([8, 9] as const).map(n => (
+            <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
+              fill="none" stroke="white" strokeWidth={0.3} />
+          ))}
+          <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2}
+            fill="none" stroke="white" strokeWidth={0.3} />
+          <circle cx={CENTER} cy={CENTER} r={2.5} fill="white" />
+        </>
+      )}
+
+      {/* Ring labels (radii scaled for zoom) */}
+      {ringLabels.map(({ n, r, color }) =>
+        LABEL_DIRS.map(([dx, dy]) => (
+          <text
+            key={`${n}-${dx}-${dy}`}
+            x={CENTER + dx * r}
+            y={CENTER + dy * r}
+            fontSize={labelFont}
+            fill={color}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className={styles.label}
+          >{n}</text>
+        ))
+      )}
+    </>
+  );
+
+  // Shot markers, shared unmodified between the main canvas and the loupe HUD.
+  const shotElements = shots.map(shot => {
+    // Use dragging position if this is the shot being dragged
+    const xh = dragging && dragging.shotId === shot.id ? dragging.xh : shot.x;
+    const yh = dragging && dragging.shotId === shot.id ? dragging.yh : shot.y;
+    // Scale for zoom display
+    const sp = targetToScreen(xh * ZOOM_SCALE, yh * ZOOM_SCALE, SVG_TARGET_RECT);
+
+    const isLast = lastShot !== null && shot.id === lastShot.id;
+    const isDragging = dragging !== null && dragging.shotId === shot.id;
+    const isSelected = selectedShotId !== null && selectedShotId !== undefined && shot.id === selectedShotId && !isLast;
+    const emphasis = isDragging || isLast || isSelected;
+
+    const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
+    const fillColor = isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black';
+    const strokeColor = 'white';
+    const textFill = 'white';
+
+    return (
+      <g key={shot.id}>
+        <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="white" strokeWidth={0.6} />
+        <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
+        <text
+          x={sp.px} y={sp.py}
+          fontSize={fontSize}
+          fill={textFill}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontWeight="bold"
+          className={styles.label}
+        >{shot.shotNumber}</text>
+      </g>
+    );
+  });
+
+  // Crosshair + loupe center: current drag point in the same scaled screen space.
+  const dragScreenPoint = dragging
+    ? targetToScreen(dragging.xh * ZOOM_SCALE, dragging.yh * ZOOM_SCALE, SVG_TARGET_RECT)
+    : null;
+
   return (
-    <div
-      ref={containerRef}
-      style={{
-        flex: 1,
-        minHeight: 0,
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        touchAction: 'none',
-      }}
-    >
+    <div ref={containerRef} className={styles.container}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${VIEW} ${VIEW}`}
-        style={{
-          width: size ? `${size}px` : '100%',
-          height: size ? `${size}px` : '100%',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          touchAction: 'none',
-        }}
+        className={styles.svg}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
-        {/* 1. White background — always full viewBox radius */}
-        <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
+        {ringElements}
+        {shotElements}
 
-        {/* 2. Black zone: solid black circle up to ring-7 boundary (scaled for zoom) */}
-        <circle cx={CENTER} cy={CENTER}
-          r={(isZoom9 ? RING_D[9] : RING_D[7]) / 2 * ZOOM_SCALE} fill="black" />
-
-        {/* 3. Ring boundary lines (radii scaled by ZOOM_SCALE) */}
-        {isZoom7 || isZoom9 ? (
-          <>
-            {/* Zoomed views: outer boundary is the selected ring, with inner rings shown. */}
-            {(isZoom7 ? [8, 9] : [10]).map(n => (
-              <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2 * ZOOM_SCALE}
-                fill="none" stroke="white" strokeWidth={0.3} />
-            ))}
-            <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2 * ZOOM_SCALE}
-              fill="none" stroke="white" strokeWidth={0.3} />
-            <circle cx={CENTER} cy={CENTER} r={2.5 * ZOOM_SCALE} fill="white" />
-          </>
-        ) : (
-          <>
-            {/* Full: outer rings 1-6 (black stroke on white), inner 8-9 (white stroke on black) */}
-            {([1, 2, 3, 4, 5, 6] as const).map(n => (
-              <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
-                fill="none" stroke="#333" strokeWidth={0.3} />
-            ))}
-            {([8, 9] as const).map(n => (
-              <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
-                fill="none" stroke="white" strokeWidth={0.3} />
-            ))}
-            <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2}
-              fill="none" stroke="white" strokeWidth={0.3} />
-            <circle cx={CENTER} cy={CENTER} r={2.5} fill="white" />
-          </>
+        {/* Crosshair at the current touch/drag point — the finger occludes the
+            point itself, but the loupe HUD above shows this same crosshair
+            magnified and unobstructed. */}
+        {dragScreenPoint && (
+          <g className={styles.crosshair}>
+            <circle cx={dragScreenPoint.px} cy={dragScreenPoint.py} r={1} fill="none" stroke="#e11d48" strokeWidth={0.5} />
+            <line x1={dragScreenPoint.px - 3} y1={dragScreenPoint.py} x2={dragScreenPoint.px + 3} y2={dragScreenPoint.py} stroke="#e11d48" strokeWidth={0.3} />
+            <line x1={dragScreenPoint.px} y1={dragScreenPoint.py - 3} x2={dragScreenPoint.px} y2={dragScreenPoint.py + 3} stroke="#e11d48" strokeWidth={0.3} />
+          </g>
         )}
-
-        {/* Ring labels (radii scaled for zoom) */}
-        {ringLabels.map(({ n, r, color }) =>
-          LABEL_DIRS.map(([dx, dy]) => (
-            <text
-              key={`${n}-${dx}-${dy}`}
-              x={CENTER + dx * r}
-              y={CENTER + dy * r}
-              fontSize={labelFont}
-              fill={color}
-              textAnchor="middle"
-              dominantBaseline="central"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}
-            >{n}</text>
-          ))
-        )}
-
-        {/* Shot markers (coordinates scaled by ZOOM_SCALE for zoomed view) */}
-        {shots.map(shot => {
-          // Use dragging position if this is the shot being dragged
-          const xh = dragging && dragging.shotId === shot.id ? dragging.xh : shot.x;
-          const yh = dragging && dragging.shotId === shot.id ? dragging.yh : shot.y;
-          // Scale for zoom display
-          const sp = targetToScreen(xh * ZOOM_SCALE, yh * ZOOM_SCALE, SVG_TARGET_RECT);
-
-          const isLast = lastShot !== null && shot.id === lastShot.id;
-          const isDragging = dragging !== null && dragging.shotId === shot.id;
-          const isSelected = selectedShotId !== null && selectedShotId !== undefined && shot.id === selectedShotId && !isLast;
-          const emphasis = isDragging || isLast || isSelected;
-
-          const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
-          const fillColor = isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black';
-          const strokeColor = 'white';
-          const textFill = 'white';
-
-          return (
-            <g key={shot.id}>
-              <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="white" strokeWidth={0.6} />
-              <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
-              <text
-                x={sp.px} y={sp.py}
-                fontSize={fontSize}
-                fill={textFill}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontWeight="bold"
-                style={{ userSelect: 'none', pointerEvents: 'none' }}
-              >{shot.shotNumber}</text>
-            </g>
-          );
-        })}
       </svg>
+
+      {dragScreenPoint && (
+        <TargetLoupe centerPx={dragScreenPoint.px} centerPy={dragScreenPoint.py} cropSize={LOUPE_CROP_SIZE}>
+          {ringElements}
+          {shotElements}
+        </TargetLoupe>
+      )}
     </div>
   );
 }

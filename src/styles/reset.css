@@ -1,0 +1,45 @@
+@import './tokens.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  font-family: var(--font-system);
+  background: var(--color-bg-app);
+  color: var(--color-text-main);
+}
+
+#root {
+  height: 100%;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Global visible focus ring for keyboard navigation, so every interactive
+   control (including ones without a module-scoped :focus-visible rule,
+   e.g. UpdateBanner and TrainingScreen toolbar buttons) gets one. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.unsupported {
+  padding: 24px;
+  padding-top: calc(24px + var(--safe-top));
+  font-family: var(--font-system);
+  text-align: center;
+}

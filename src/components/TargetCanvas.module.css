@@ -1,0 +1,29 @@
+.container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  position: relative;
+  container-type: size;
+}
+
+/* Largest square that fits the container, computed purely in CSS via
+   container query units (no JS/ResizeObserver, no inline styles). */
+.svg {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+  touch-action: none;
+}
+
+.label {
+  user-select: none;
+  pointer-events: none;
+}
+
+.crosshair {
+  pointer-events: none;
+}

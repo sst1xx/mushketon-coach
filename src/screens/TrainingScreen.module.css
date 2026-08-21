@@ -1,0 +1,199 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  user-select: none;
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 4px;
+  flex-shrink: 0;
+}
+
+.back {
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--color-text-main);
+  padding: 10px 0;
+}
+
+.athleteName {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shotNum {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.zoomToggle {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13px;
+  padding: 8px 10px;
+  cursor: pointer;
+  line-height: 1;
+  text-align: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: var(--touch-target-min);
+}
+
+.scoreDisplay {
+  text-align: center;
+  font-size: 48px;
+  font-weight: 700;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-main);
+  flex-shrink: 0;
+}
+
+.completedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--color-bg-app);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.completedBannerText {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.newTrainingBannerBtn {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: var(--touch-target-min);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px calc(16px + var(--safe-bottom));
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.undoBtn {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: var(--touch-target-min);
+}
+
+.commentBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  font-size: 18px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: none;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.newTrainingBtn {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: var(--touch-target-min);
+}
+
+.disabled {
+  opacity: 0.4;
+}
+
+.commentTextarea {
+  width: 100%;
+  font-size: var(--input-font-size);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--font-system);
+}
+
+.dialogInfo {
+  color: var(--color-text-muted);
+  font-size: 15px;
+  margin: 4px 0;
+}
+
+.dialogHeading {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--color-text-main);
+}
+
+.toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-bg-toolbar);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  transition: opacity var(--transition-duration) ease;
+}
+
+.targetWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}

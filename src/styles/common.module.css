@@ -1,0 +1,94 @@
+/* Shared button/utility classes reused across screens. */
+
+.btn {
+  min-height: var(--touch-target-min);
+  padding: 8px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.btn:active {
+  background: var(--color-primary-active);
+  transform: scale(0.97);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.btnGhost {
+  min-height: var(--touch-target-min);
+  padding: 8px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: none;
+  cursor: pointer;
+}
+.btnGhost:active {
+  background: var(--color-bg-app);
+  transform: scale(0.97);
+}
+.btnGhost:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.btnDanger {
+  min-height: var(--touch-target-min);
+  padding: 8px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-danger);
+  color: #fff;
+  cursor: pointer;
+}
+.btnDanger:active {
+  background: var(--color-danger-active);
+  transform: scale(0.97);
+}
+.btnDanger:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.btnDanger:disabled,
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Layout-reserved 44x44 touch target wrapper for compact icon buttons. */
+.touchTarget {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  font-size: 18px;
+}
+.touchTarget:active {
+  transform: scale(0.97);
+}
+.touchTarget:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
