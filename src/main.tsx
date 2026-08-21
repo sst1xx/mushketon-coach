@@ -16,7 +16,7 @@ function Root() {
 
   React.useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-    const workbox = new Workbox('/sw.js');
+    const workbox = new Workbox(`${import.meta.env.BASE_URL}sw.js`);
     setWb(workbox);
 
     workbox.addEventListener('waiting', () => setShowBanner(true));
