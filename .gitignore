@@ -12,3 +12,4 @@ context.md
 .claude
 .agents
 .env
+.wrangler
