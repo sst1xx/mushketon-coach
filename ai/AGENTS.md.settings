@@ -19,6 +19,8 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 8. NEVER edit files in `main/`. `main/` is read-only reference; all work happens in a `wt-*/`
    worktree and reaches `main` only through merge. Direct edits in `main/` require an explicit
    one-off user request.
+9. NEVER name concrete models, vendors, or agent-tool APIs in this file — describe roles and
+   capabilities only. Model and cost bindings belong to the agent tool's own config.
 
 ## 2. Commands
 
@@ -28,13 +30,22 @@ All commands run **inside a `wt-*/` worktree**, not in the container root and no
 ```bash
 npm install
 npm run dev        # Vite dev server
-npx vitest run     # tests — must stay green (285 passing)
-npm run build      # tsc + vite build → dist/
+npx vitest run     # tests — must stay green (344 passing, 11 files)
+npm run build      # tsc -p tsconfig.app.json + vite build → dist/
 npm run preview
 ```
 
 `npm test` also works. After code changes always run `npx vitest run`; run `npm run build` too if
-types could break.
+types could break. There is no local deploy script: pushing `main` triggers
+`.github/workflows/deploy-github-pages.yml`.
+
+Test conventions:
+
+- `vitest.config.ts` sets `globals: false` — always import `describe/it/expect` from `vitest`.
+- Component tests render with `renderToStaticMarkup` (no DOM environment), e.g.
+  `targetCanvas.render.test.tsx`, `Modal.test.tsx`.
+- IndexedDB tests start with `import 'fake-indexeddb/auto';`.
+- `npm run build` type-checks via `tsconfig.app.json`, which does not cover test files.
 
 ## 3. Where things are
 
@@ -42,34 +53,47 @@ types could break.
 src/scoring.ts        ISSF decimal score (pure)          + scoring.test.ts
 src/transform.ts      screen ↔ target coordinates (pure) + transform.test.ts
 src/db/               IndexedDB: schema, open, tx+epoch, settings, startup cleanup
-src/domain/           athleteRepo, trainingRepo, shotRepo, backupService
-src/components/       TargetCanvas (SVG target + shots), UpdateBanner
-src/screens/          AthletesScreen, TrainingsScreen, TrainingScreen, SettingsScreen
+src/domain/           athleteRepo, trainingRepo, shotRepo, commentRepo, backupService, index.ts
+src/components/       TargetCanvas (SVG target + shots), TargetLoupe, Modal + modalController,
+                      UpdateBanner, shotMarker, targetLabels
+src/screens/          AthletesScreen, TrainingsScreen, TrainingScreen, RemarksScreen,
+                      SettingsScreen
+src/utils/            useWakeLock + wakeLockController
+src/styles/           tokens.css (design tokens), reset.css, common.module.css
 src/App.tsx           screen routing        src/main.tsx bootstrap      src/sw.ts service worker
 public/_headers       CSP + security headers
-vite.config.ts        Vite + vite-plugin-pwa (injectManifest, prompt update)
-wrangler.toml         Cloudflare Pages (static hosting only, output dir dist)
+scripts/gen-icons.py  regenerates PWA icons
+vite.config.ts        Vite + vite-plugin-pwa (injectManifest, prompt update); base is
+                      `/mushketon-coach/` for GitHub Pages, `/` otherwise
+.github/workflows/deploy-github-pages.yml   build + deploy on push to main (primary hosting)
+wrangler.toml         Cloudflare Pages (alternative static hosting, output dir dist)
 docs/plans/PLAN.md         full spec, source of truth (RU)
 docs/plans/PLAN-*.md       per-feature plans; use docs/plans/PLAN-TARGET-ZOOM.md as template
+docs/specs/, docs/bugs/    bugfix specs and bug reports
 docs/reference/CHANGES-TARGET-VISUAL.md  exact ISSF target geometry and colors
+docs/reference/CLOUDFLARE-FREE-CONSTRAINTS.md  limits of the free hosting tier
 ```
 
 All paths above (`src/…`, `docs/plans/…`, etc.) are relative to the **current worktree**, e.g.
 `main/src/scoring.ts`. Container layout (see §9 Worktrees):
 
 ```
-mushketon-coach/        # container, path never changes — pi runs from here
+mushketon-coach/        # container, path never changes — the agent starts here
 ├── .bare/               # bare git dir
 ├── .git                 # pointer file: "gitdir: ./.bare"
-├── .pi/ .claude/ .agents/               # pi/agent config — root only, never in a worktree
+├── .pi/ .claude/ .agents/               # agent-tool config — root only, never in a worktree
 ├── .wrangler/ .env  node_modules/      # build/deploy state — real here, symlinked into worktrees
 ├── main/                # worktree of branch main — read-only, never edited directly
 └── wt-<feature>/        # feature worktrees, created on demand
 ```
 
-pi is started from the container root, so its config (`.pi/`, `.claude/`, `.agents/`) lives there
-only — a worktree must never have its own copy or symlink of it, it should contain code only
-(plus the build/deploy symlinks it needs).
+The agent tool is started from the container root, so its config (`.pi/`, `.claude/`, `.agents/`)
+lives there only — a worktree must never have its own copy or symlink of it, it should contain code
+only (plus the build/deploy symlinks it needs).
+
+`AGENTS.md` in the container root is a symlink to `main/ai/AGENTS.md.settings`. Edit these rules
+only in `wt-*/ai/AGENTS.md.settings`; the root file updates itself after the merge into `main`.
+Until that merge, the worktree and the root can show different versions of the rules.
 
 Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fake-indexeddb.
 
@@ -82,6 +106,8 @@ Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fa
 - `dataEpoch` guards writes from stale clients after a restore.
 - Backup = one JSON file (`version: 1`) with all data; see `BackupFile` in
   `src/domain/backupService.ts`. Restore is validated and atomic. Backup strings render as text only.
+- Styling: CSS Modules next to the component (`Foo.module.css`); take colors and spacing from
+  `src/styles/tokens.css`, do not hardcode them.
 
 ## 5. Product decisions (locked)
 
@@ -92,21 +118,24 @@ Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fa
 - All hits are drawn on target, older ones less prominent.
 - Last shot and older shots are editable repeatedly; undo exists for the last created shot.
 - Deletion requires confirmation.
-- "Анализ — в разработке" stays a stub.
+- Shot comments (remarks) are implemented: `commentRepo` + `RemarksScreen`, comments link to their
+  training shots.
+- "Анализ — в разработке" in `SettingsScreen` stays a stub.
 
-Not in MVP: analysis, charts, group stats, comments, sighting/match series, sync, accounts,
-cloud DB, electronic-target integration, camera recognition, competitions, per-training export.
+Not in MVP: analysis, charts, group stats, sighting/match series, sync, accounts, cloud DB,
+electronic-target integration, camera recognition, competitions, per-training export.
 
 ## 6. Status
 
-Done: scoring, transform, IndexedDB layer, domain repos, all four screens, backup/restore, PWA,
-CSP, Cloudflare Pages config. Tests green (285).
+Done: scoring, transform, IndexedDB layer, domain repos, all five screens, shot remarks,
+backup/restore, PWA, CSP, GitHub Pages deploy workflow, Cloudflare Pages config. Tests green (344).
 Partial: ISSF target visuals — verify against `docs/reference/CHANGES-TARGET-VISUAL.md` before touching.
 Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6); analysis module.
 
-## 7. Delegating to subagents
+## 7. Delegating to helper agents
 
-Agents (see `.pi/settings.json`), cheapest first: `scout` < `worker` < `reviewer` < `oracle`.
+Roles, cheapest first: `scout` < `worker` < `reviewer` < `oracle`. Model and cost bindings per role
+live in the agent tool's own config, never in this file.
 
 | Task | Agent |
 | --- | --- |
@@ -118,34 +147,21 @@ Agents (see `.pi/settings.json`), cheapest first: `scout` < `worker` < `reviewer
 Default pipeline: `scout` → plan → `worker` → `reviewer`.
 
 Rules:
-- The coordinator does not edit code or deploy — always delegate to `worker`.
-- `worker` always runs inside a `wt-*/` worktree, never in `main/`.
-- Use `context: fresh` for every implementation handoff.
-- One `worker` writing in the working directory at a time.
-- Every handoff = one focused task + plan reference + acceptance criteria + verification command
-  (usually `npx vitest run`).
-- Review is mandatory after every `worker` change — no exceptions for size or triviality
-  (including docs/comments/formatting); `reviewer` only reviews/reports and never edits files.
-- All fixes are implemented by `worker` and then re-reviewed by `reviewer`.
+- The coordinator **never** edits code and **never** deploys — it always delegates to `worker` and
+  never falls back to doing the work itself. `worker` is the only role that changes code or deploys.
+- `reviewer` is **mandatory** after every `worker` change — no exceptions for size or triviality
+  (including docs, comments, formatting). It only reports findings and never edits files; every fix
+  goes back to `worker`, which re-verifies and is then re-reviewed.
+- `worker` always runs inside a `wt-*/` worktree, never in `main/`. One writer per worktree;
+  parallel work needs separate worktrees (see §8).
+- Every implementation handoff starts from a clean context (no inherited chat history) and carries
+  one focused task + plan reference + acceptance criteria + verification command (usually
+  `npx vitest run`).
+- If `worker` fails (tests/build/deploy), the coordinator fixes the handoff or the environment and
+  re-runs `worker` — it does not fix the code itself.
+- Deploy and commit: only `worker`, only after a successful `reviewer` pass, only with explicit user
+  permission (see §1).
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
-- Rework found by `reviewer` goes back to `worker`.
-- Isolation for parallel `worker` runs is achieved with separate worktrees (see §8); the rule
-  "one writer per working directory" still applies within each worktree.
-
-### Mandatory order of operations
-
-- The coordinator **never** edits code and **never** deploys — always delegates, never falls back
-  to doing the work directly.
-- `worker` is the **only** agent that changes code and runs deploys.
-- `reviewer` is **mandatory** after every `worker` change — no exceptions for size or triviality.
-- If `worker` fails (tests/build/deploy): the coordinator does **not** fix it directly. Fix the
-  handoff and/or environment, then re-run `worker` with the same task.
-- Deploy: only `worker` runs it, only after a successful `reviewer` pass, and only with explicit
-  user permission (see §1).
-- Commit: same confirmation rule as deploy — explicit user request first (see §1).
-- Reviewer fixes: `reviewer` only reports findings; it never applies fixes itself. Every fix is
-  done by `worker`, which re-verifies (re-runs tests/build), and then goes through a mandatory
-  re-review by `reviewer`.
 
 ## 8. Worktrees
 
@@ -154,7 +170,11 @@ Create a feature worktree:
 ```bash
 cd ~/Downloads/home/mushketon-coach
 git worktree add wt-<feature> -b <feature>
-cd wt-<feature> && npx vitest run
+cd wt-<feature>
+ln -s ../node_modules node_modules      # required, otherwise vitest/vite cannot run
+ln -s ../.env .env                      # only if the task needs build/deploy state
+ln -s ../.wrangler .wrangler            # only if the task needs build/deploy state
+npx vitest run
 ```
 
 Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
@@ -162,13 +182,8 @@ Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
 Rules:
 - `main/` is never a work directory: no edits, no `worker` runs there.
 - `docs/plans/` and code are versioned per branch, same as before.
-- `.pi`, `.claude`, `.agents` stay **only at the container root** — pi/agent config, not needed
+- `.pi`, `.claude`, `.agents` stay **only at the container root** — agent-tool config, not needed
   inside a worktree. Do not symlink or copy them into `main/` or `wt-*/`.
-- If a branch needs different dependencies, run a local `npm install` in that worktree.
+- If a branch needs different dependencies, replace the `node_modules` symlink with a real local
+  `npm install` in that worktree.
 - One `worker` writer per worktree. Parallel tasks → separate worktrees (see §7).
-
-## 9. Output style
-
-- Report only changed blocks (diff with 3–5 lines context), not whole files.
-- For test/build output report the summary line, or the filtered errors if it failed.
-- If the request is ambiguous, ask instead of guessing.
