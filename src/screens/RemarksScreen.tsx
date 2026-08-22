@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { openDB } from '../db/open';
 import { readEpoch } from '../db/tx';
-import { AthleteRecord, CommentRecord } from '../db/schema';
+import { AthleteRecord, CommentRecord, ShotRecord, TrainingRecord } from '../db/schema';
 import {
   listCommentsByAthlete,
   updateComment,
   deleteComment,
 } from '../domain/commentRepo';
+import { getShot } from '../domain/shotRepo';
+import { getTraining } from '../domain/trainingRepo';
 import Modal from '../components/Modal';
 import s from './RemarksScreen.module.css';
 
@@ -14,17 +16,31 @@ interface Props {
   athlete: AthleteRecord;
   epoch: number;
   onBack: () => void;
+  onSelectTraining: (training: TrainingRecord) => void;
 }
 
-export default function RemarksScreen({ athlete, epoch, onBack }: Props) {
+function formatShotLabel(shot: ShotRecord | undefined): string {
+  if (!shot) return 'Выстрел удалён';
+  const scoreLabel = shot.score > 0 ? (shot.score / 10).toFixed(1) : '0.0';
+  return `Выстрел №${shot.shotNumber} • ${scoreLabel}`;
+}
+
+export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining }: Props) {
   const [comments, setComments] = useState<CommentRecord[]>([]);
+  const [shotsById, setShotsById] = useState<Record<string, ShotRecord | undefined>>({});
   const [loading, setLoading] = useState(true);
   const [editTarget, setEditTarget] = useState<CommentRecord | null>(null);
   const [editText, setEditText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<CommentRecord | null>(null);
 
   const load = useCallback(async () => {
-    setComments(await listCommentsByAthlete(athlete.id));
+    const list = await listCommentsByAthlete(athlete.id);
+    setComments(list);
+    const uniqueShotIds = Array.from(new Set(list.map(c => c.shotId)));
+    const shots = await Promise.all(uniqueShotIds.map(id => getShot(id)));
+    const map: Record<string, ShotRecord | undefined> = {};
+    uniqueShotIds.forEach((id, i) => { map[id] = shots[i]; });
+    setShotsById(map);
     setLoading(false);
   }, [athlete.id]);
 
@@ -44,6 +60,11 @@ export default function RemarksScreen({ athlete, epoch, onBack }: Props) {
     await updateComment(editTarget.id, trimmed, ep);
     setEditTarget(null);
     await load();
+  };
+
+  const handleShotClick = async (shot: ShotRecord) => {
+    const training = await getTraining(shot.trainingId);
+    if (training) onSelectTraining(training);
   };
 
   const handleDelete = async (c: CommentRecord) => {
@@ -78,7 +99,19 @@ export default function RemarksScreen({ athlete, epoch, onBack }: Props) {
             <li key={c.id} className={s.item}>
               <div className={s.itemContent}>
                 <p className={s.commentText}>{c.text}</p>
-                <p className={s.commentMeta}>{formatDate(c.createdAt)}</p>
+                {shotsById[c.shotId] ? (
+                  <button
+                    type="button"
+                    className={s.shotLink}
+                    onClick={() => handleShotClick(shotsById[c.shotId]!)}
+                  >
+                    {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
+                  </button>
+                ) : (
+                  <p className={s.commentMeta}>
+                    {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
+                  </p>
+                )}
               </div>
               <div className={s.itemActions}>
                 <button className={s.editBtn} onClick={() => handleEditOpen(c)} aria-label="Редактировать">✎</button>

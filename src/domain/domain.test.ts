@@ -20,6 +20,7 @@ import {
    deleteCommittedShotForUndo,
    undoLastShot,
    listShots,
+   getShot,
    exportBackup,
    validateBackup,
    importBackup,
@@ -142,6 +143,12 @@ describe('shotRepo', () => {
     const s2 = await createDraft(trainingId, 300, 400, epoch);
     expect(s2.shotNumber).toBe(2);
     expect(await listShots(trainingId)).toHaveLength(2);
+    });
+
+  it('getShot returns the shot by id, or undefined if missing', async () => {
+    const s1 = await createDraft(trainingId, 100, 200, epoch);
+    expect(await getShot(s1.id)).toEqual(s1);
+    expect(await getShot('missing-id')).toBeUndefined();
     });
 
   it('commitShot sets status=committed and recalculates score', async () => {
