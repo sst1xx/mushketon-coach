@@ -82,7 +82,8 @@ mushketon-coach/        # container, path never changes — the agent starts her
 ├── .bare/               # bare git dir
 ├── .git                 # pointer file: "gitdir: ./.bare"
 ├── .pi/ .claude/ .agents/               # agent-tool config — root only, never in a worktree
-├── .wrangler/ .env  node_modules/      # build/deploy state — real here, symlinked into worktrees
+├── .wrangler/ node_modules/            # real here; node_modules is symlinked into each worktree
+│                                     # by a committed symlink, .wrangler only on demand
 ├── main/                # worktree of branch main — read-only, never edited directly
 └── wt-<feature>/        # feature worktrees, created on demand
 ```
@@ -170,12 +171,13 @@ Create a feature worktree:
 ```bash
 cd ~/Downloads/home/mushketon-coach
 git worktree add wt-<feature> -b <feature>
-cd wt-<feature>
-ln -s ../node_modules node_modules      # required, otherwise vitest/vite cannot run
-ln -s ../.env .env                      # only if the task needs build/deploy state
-ln -s ../.wrangler .wrangler            # only if the task needs build/deploy state
-npx vitest run
+cd wt-<feature> && npx vitest run
 ```
+
+`node_modules` is committed as a relative symlink (`../node_modules`, git mode 120000, commit
+`15d6692`), so `git worktree add` materializes it automatically — do not create it by hand.
+`.env` and `.wrangler` are gitignored and stay in the container root only; symlink them into a
+worktree by hand if a task actually needs build/deploy state.
 
 Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
 
