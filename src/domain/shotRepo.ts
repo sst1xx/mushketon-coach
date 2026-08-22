@@ -191,6 +191,18 @@ export async function undoLastShot(
   return true;
 }
 
+// ─── getShot ────────────────────────────────────────────────────────────────
+
+export async function getShot(id: string): Promise<ShotRecord | undefined> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('shots', 'readonly');
+    const req = tx.objectStore('shots').get(id);
+    req.onsuccess = () => resolve(req.result as ShotRecord | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 // ─── listShots ───────────────────────────────────────────────────────────────
 
 export async function listShots(trainingId: string): Promise<ShotRecord[]> {
