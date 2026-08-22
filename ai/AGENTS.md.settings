@@ -63,7 +63,6 @@ mushketon-coach/        # container, path never changes — pi runs from here
 ├── .git                 # pointer file: "gitdir: ./.bare"
 ├── .pi/ .claude/ .agents/               # pi/agent config — root only, never in a worktree
 ├── .wrangler/ .env  node_modules/      # build/deploy state — real here, symlinked into worktrees
-├── link-shared.sh       # symlinks .wrangler/.env/node_modules into a worktree
 ├── main/                # worktree of branch main — read-only, never edited directly
 └── wt-<feature>/        # feature worktrees, created on demand
 ```
@@ -155,7 +154,6 @@ Create a feature worktree:
 ```bash
 cd ~/Downloads/home/mushketon-coach
 git worktree add wt-<feature> -b <feature>
-./link-shared.sh wt-<feature>
 cd wt-<feature> && npx vitest run
 ```
 
@@ -164,13 +162,9 @@ Remove it: `git worktree remove wt-<feature>` (symlinks go with the folder).
 Rules:
 - `main/` is never a work directory: no edits, no `worker` runs there.
 - `docs/plans/` and code are versioned per branch, same as before.
-- `.wrangler`, `.env`, `node_modules` live for real at the container root; each worktree gets
-  **symlinks** to them via `link-shared.sh` (needed to build/test/deploy from inside the worktree).
-  Never commit the symlinks, never edit the shared configs "for one branch only".
 - `.pi`, `.claude`, `.agents` stay **only at the container root** — pi/agent config, not needed
   inside a worktree. Do not symlink or copy them into `main/` or `wt-*/`.
-- If a branch needs different dependencies: remove the `node_modules` symlink and run a local
-  `npm install` in that worktree instead.
+- If a branch needs different dependencies, run a local `npm install` in that worktree.
 - One `worker` writer per worktree. Parallel tasks → separate worktrees (see §7).
 
 ## 9. Output style
