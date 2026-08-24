@@ -1,4 +1,4 @@
-# mushketon-coach
+# Мушкетон-тренер
 
 <img src="public/icon-192.png" alt="mushketon-coach icon" width="96" height="96">
 
