@@ -70,7 +70,7 @@ export function computeRingLabels(zoomMode: ZoomMode): LabelEntry[] {
 }
 
 const LABEL_FONT_FULL = 3.5;
-const LABEL_FONT_ZOOM7 = 5;
+const LABEL_FONT_ZOOM7 = 5 * 1.5;
 const LABEL_FONT_ZOOM9 = LABEL_FONT_ZOOM7 * (ZOOM9_SCALE / ZOOM7_SCALE) * 1.5;
 
 // Label directions: all use centered anchors; the direction only changes the
