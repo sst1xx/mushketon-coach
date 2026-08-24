@@ -16,6 +16,8 @@ import {
   shouldCompleteTrainingAfterShot,
 } from '../domain/trainingRepo';
 import TargetCanvas from '../components/TargetCanvas';
+import ShotsList from '../components/ShotsList';
+import { formatTrainingTotal } from './trainingTotal';
 import { getSetting, setSetting } from '../db/settings';
 import {
   createComment,
@@ -252,17 +254,10 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         </span>
       </div>
 
-      {/* Completed notification banner */}
+      {/* Completed notification banner (status only; the action lives in the fixed-width toolbar below) */}
       {isCompleted && (
         <div className={s.completedBanner}>
           <span className={s.completedBannerText}>Тренировка завершена</span>
-          <button
-            className={s.newTrainingBannerBtn}
-            onClick={handleCreateNewTraining}
-            aria-label="Новая тренировка"
-          >
-            + Новая тренировка
-          </button>
         </div>
       )}
 
@@ -281,40 +276,71 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         {toast && <div className={s.toast}>{toast}</div>}
       </div>
 
-      {/* Score */}
+      {/* Shot history (left column) + score + shot history (right column) */}
+      <div className={s.shotsListWrapLeft}>
+        <ShotsList shots={shots} side="left" />
+      </div>
       <div className={s.scoreDisplay}>{displayScore}</div>
+      <div className={s.shotsListWrapRight}>
+        <ShotsList shots={shots} side="right" />
+      </div>
 
-      {/* Bottom toolbar */}
+      {/* Training total: whole-point sum and ISSF decimal sum, committed shots only */}
+      <div className={s.totalsRow}>{formatTrainingTotal(shots)}</div>
+
+      {/* Desktop-only sidebar: full ordered shot history with the total as its last row (see s.sidebarWrap, hidden on phone) */}
+      <div className={s.sidebarWrap}>
+        <div className={s.sidebarList}>
+          <ShotsList shots={shots} side="all" />
+        </div>
+        <div className={s.sidebarTotalsRow}>{formatTrainingTotal(shots)}</div>
+      </div>
+
+      {/* Bottom toolbar: 3 fixed-width slots, zoom always centered.
+          Left/right slots swap action by isCompleted so zoom never shifts position. */}
       <div className={s.toolbar}>
+        {isCompleted ? (
+          <button
+            className={s.slotBtn}
+            onClick={handleOpenComment}
+            disabled={!targetShot}
+            aria-label="Замечания"
+          >
+            Замечания
+          </button>
+        ) : (
+          <button
+            className={`${s.slotBtn} ${canUndo ? '' : s.disabled}`}
+            onClick={handleUndo}
+            disabled={!canUndo}
+            aria-label="Отменить последний"
+          >
+            Отменить
+          </button>
+        )}
         <button
-          className={`${s.undoBtn} ${canUndo ? '' : s.disabled}`}
-          onClick={handleUndo}
-          disabled={!canUndo}
-        >
-          Отменить последний
-        </button>
-        <button
-          className={s.zoomToggle}
+          className={s.slotBtn}
           onClick={toggleZoom}
           aria-label="Масштаб"
         >
           {ZOOM_LABELS[zoomMode]}
         </button>
-        <button
-          className={`${s.commentBtn} ${targetShot && dragging === null ? '' : s.disabled}`}
-          onClick={handleOpenComment}
-          disabled={!targetShot || dragging !== null}
-          aria-label="Добавить замечание"
-        >
-          💬
-        </button>
-        {isCompleted && (
+        {isCompleted ? (
           <button
-            className={s.newTrainingBtn}
+            className={`${s.slotBtn} ${s.slotBtnPrimary}`}
             onClick={handleCreateNewTraining}
             aria-label="Новая тренировка"
           >
-            + Новая
+            + Новая тренировка
+          </button>
+        ) : (
+          <button
+            className={`${s.slotBtn} ${targetShot && dragging === null ? '' : s.disabled}`}
+            onClick={handleOpenComment}
+            disabled={!targetShot || dragging !== null}
+            aria-label="Добавить замечание"
+          >
+            Замечание
           </button>
         )}
       </div>

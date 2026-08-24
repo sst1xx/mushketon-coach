@@ -1,6 +1,17 @@
 .page {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 84px 1fr 84px;
+  /* listL/score/listR row is a fixed height (not "auto"), so a growing shot
+     history cannot expand this row and squeeze the target/toolbar out of the
+     viewport — the list itself scrolls within that fixed box instead. */
+  grid-template-rows: auto auto minmax(0, 1fr) 112px auto auto;
+  grid-template-areas:
+    "header header header"
+    "banner banner banner"
+    "target target target"
+    "listL  score listR"
+    "total  total total"
+    "toolbar toolbar toolbar";
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -12,6 +23,7 @@
 }
 
 .header {
+  grid-area: header;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -43,21 +55,11 @@
   white-space: nowrap;
 }
 
-.zoomToggle {
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 13px;
-  padding: 8px 10px;
-  cursor: pointer;
-  line-height: 1;
-  text-align: center;
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-height: var(--touch-target-min);
-}
-
 .scoreDisplay {
+  grid-area: score;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 48px;
   font-weight: 700;
@@ -67,10 +69,61 @@
   flex-shrink: 0;
 }
 
+.shotsListWrapLeft {
+  grid-area: listL;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.shotsListWrapRight {
+  grid-area: listR;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.totalsRow {
+  grid-area: total;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-main);
+  padding: 2px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Desktop-only sidebar: full ordered shot history + its own totals row as the
+   table's last row. Hidden by default (phone uses the split listL/listR columns +
+   full-width .totalsRow instead); switched to display: flex and placed in the
+   "sidebar" grid area only by the >=900px rule above. */
+.sidebarWrap {
+  display: none;
+  grid-area: sidebar;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebarList {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sidebarTotalsRow {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-main);
+  padding: 6px 4px;
+  border-top: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
 .completedBanner {
+  grid-area: banner;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 6px 16px;
   background: var(--color-bg-app);
   border-bottom: 1px solid var(--color-border);
@@ -83,23 +136,13 @@
   color: var(--color-text-main);
 }
 
-.newTrainingBannerBtn {
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 6px;
-  border: none;
-  background: var(--color-primary);
-  color: #fff;
-  cursor: pointer;
-  font-weight: 600;
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-height: var(--touch-target-min);
-}
-
+/* Fixed 3-slot toolbar: left/center/right slots stay equal width across the
+   active/completed states so the centered zoom button (always the middle
+   slot) never shifts position, only its left/right neighbors swap action. */
 .toolbar {
-  display: flex;
-  justify-content: space-between;
+  grid-area: toolbar;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   gap: 6px;
   padding: 8px 12px calc(16px + var(--safe-bottom));
@@ -107,44 +150,28 @@
   box-sizing: border-box;
 }
 
-.undoBtn {
-  padding: 8px 10px;
+.slotBtn {
+  width: 100%;
+  padding: 8px 6px;
   font-size: 13px;
   border-radius: 6px;
   border: 1px solid var(--color-border);
   background: none;
   cursor: pointer;
-  flex-shrink: 0;
+  line-height: 1.2;
+  text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-height: var(--touch-target-min);
+  box-sizing: border-box;
 }
 
-.commentBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--touch-target-min);
-  height: var(--touch-target-min);
-  font-size: 18px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  background: none;
-  cursor: pointer;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.newTrainingBtn {
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 6px;
+.slotBtnPrimary {
   border: none;
   background: var(--color-primary);
   color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  white-space: nowrap;
-  min-height: var(--touch-target-min);
+  font-weight: 600;
 }
 
 .disabled {
@@ -192,8 +219,41 @@
 }
 
 .targetWrap {
+  grid-area: target;
   position: relative;
-  flex: 1;
   min-height: 0;
   display: flex;
+}
+
+/* Kept at the end of the file (after the unconditional `.sidebarWrap { display:
+   none }` above) so this media query wins the cascade at >=900px: with equal
+   selector specificity, CSS resolves ties by source order, not by whether a rule
+   sits inside an @media block, so placing this earlier let the always-on base
+   rule silently override `display: flex` here and hide the desktop sidebar. */
+@media (min-width: 900px) {
+  .page {
+    /* Desktop layout drops the phone-only two-column split (listL/score/listR +
+       full-width .totalsRow) in favor of a single sidebar column holding the full
+       ordered shot history + its own totals row (see .sidebarWrap above and
+       PLAN-TRAINING-SHOT-LIST.md). Target keeps minmax(0, 1fr) so it still shrinks
+       instead of breaking the fixed 100dvh page height. */
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto auto minmax(0, 1fr) 112px auto;
+    grid-template-areas:
+      "header  header"
+      "banner  banner"
+      "target  sidebar"
+      "score   sidebar"
+      "toolbar toolbar";
+  }
+
+  .shotsListWrapLeft,
+  .shotsListWrapRight,
+  .totalsRow {
+    display: none;
+  }
+
+  .sidebarWrap {
+    display: flex;
+  }
 }
