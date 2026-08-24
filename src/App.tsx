@@ -9,6 +9,7 @@ import TrainingsScreen from './screens/TrainingsScreen';
 import TrainingScreen from './screens/TrainingScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import RemarksScreen from './screens/RemarksScreen';
+import AllShotsScreen from './screens/AllShotsScreen';
 import styles from './App.module.css';
 
 type Screen = 
@@ -16,6 +17,7 @@ type Screen =
   | { name: 'trainings'; athlete: AthleteRecord }
   | { name: 'training'; athlete: AthleteRecord; training: TrainingRecord }
   | { name: 'remarks'; athlete: AthleteRecord }
+  | { name: 'allShots'; athlete: AthleteRecord }
   | { name: 'settings' };
 
 export default function App() {
@@ -66,6 +68,14 @@ export default function App() {
       />
     );
   }
+  if (screen.name === 'allShots') {
+    return (
+      <AllShotsScreen
+        athlete={screen.athlete}
+        onBack={() => setScreen({ name: 'trainings', athlete: screen.athlete })}
+      />
+    );
+  }
   if (screen.name === 'trainings') {
     return (
       <TrainingsScreen
@@ -74,6 +84,7 @@ export default function App() {
         onBack={() => setScreen({ name: 'athletes' })}
         onSelectTraining={(training) => setScreen({ name: 'training', athlete: screen.athlete, training })}
         onOpenRemarks={() => setScreen({ name: 'remarks', athlete: screen.athlete })}
+        onOpenAllShots={() => setScreen({ name: 'allShots', athlete: screen.athlete })}
       />
     );
   }

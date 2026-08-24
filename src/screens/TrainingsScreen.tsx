@@ -12,9 +12,10 @@ interface Props {
   onBack: () => void;
   onSelectTraining: (t: TrainingRecord) => void;
   onOpenRemarks?: () => void;
+  onOpenAllShots?: () => void;
 }
 
-export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining, onOpenRemarks }: Props) {
+export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining, onOpenRemarks, onOpenAllShots }: Props) {
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
@@ -55,6 +56,9 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
          <span className={s.athleteName}>{athlete.name}</span>
          {onOpenRemarks && (
            <button className={s.remarksBtn} onClick={onOpenRemarks}>Замечания</button>
+         )}
+         {onOpenAllShots && (
+           <button className={s.remarksBtn} onClick={onOpenAllShots}>Все выстрелы</button>
          )}
        </div>
        <h2 className={s.title}>Тренировки</h2>

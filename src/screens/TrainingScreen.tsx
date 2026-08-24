@@ -28,9 +28,9 @@ import { useWakeLock } from '../utils/useWakeLock';
 import s from './TrainingScreen.module.css';
 
 const ZOOM_LABELS: Record<'full' | 'zoom7' | 'zoom9', string> = {
-  full: '🎯 1-10',
+  full: '🔍 1-10',
   zoom7: '🔍 7-10',
-  zoom9: '🔬 9-10',
+  zoom9: '🔍 9-10',
 };
 
 interface Props {

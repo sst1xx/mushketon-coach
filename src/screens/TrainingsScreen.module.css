@@ -16,6 +16,7 @@
 
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
@@ -31,6 +32,7 @@
   cursor: pointer;
   color: var(--color-text-main);
   padding: 10px 0;
+  white-space: nowrap;
 }
 .back:focus-visible {
   outline: 2px solid var(--color-border-focus);
@@ -41,6 +43,10 @@
   font-size: 17px;
   font-weight: 600;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .remarksBtn {
@@ -54,6 +60,8 @@
   padding: 8px 10px;
   cursor: pointer;
   color: var(--color-text-main);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .remarksBtn:focus-visible {
   outline: 2px solid var(--color-border-focus);

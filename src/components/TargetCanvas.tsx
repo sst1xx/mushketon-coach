@@ -87,10 +87,15 @@ interface Props {
   dragging: { shotId: string; xh: number; yh: number } | null;
   selectedShotId?: string | null;
   zoomMode: ZoomMode;
-  onDragStart: (shotId: string | null, xh: number, yh: number, isExisting: boolean) => void;
-  onDragMove: (xh: number, yh: number) => void;
-  onDragEnd: (xh: number, yh: number) => void;
-  onDragCancel: () => void;
+  onDragStart?: (shotId: string | null, xh: number, yh: number, isExisting: boolean) => void;
+  onDragMove?: (xh: number, yh: number) => void;
+  onDragEnd?: (xh: number, yh: number) => void;
+  onDragCancel?: () => void;
+  readOnly?: boolean;
+  onSelectShot?: (shotId: string) => void;
+  commentedShotIds?: Set<string>;
+  shotTooltip?: (shotId: string) => string | null;
+  shotLabels?: Map<string, number>;
 }
 
 export default function TargetCanvas({
@@ -102,6 +107,11 @@ export default function TargetCanvas({
   onDragMove,
   onDragEnd,
   onDragCancel,
+  readOnly = false,
+  onSelectShot,
+  commentedShotIds,
+  shotTooltip,
+  shotLabels,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,44 +170,65 @@ export default function TargetCanvas({
   }, [shots, dragging, ZOOM_SCALE]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (readOnly) {
+      const nearest = findNearestShot(e.clientX, e.clientY);
+      if (nearest) onSelectShot?.(nearest.id);
+      return;
+    }
     // Only handle first active pointer
     if (dragging) return;
     const target = pointerToActualTarget(e.clientX, e.clientY);
     if (!target) return; // outside target circle
     const nearest = findNearestShot(e.clientX, e.clientY);
     if (nearest) {
-      onDragStart(nearest.id, nearest.x, nearest.y, true);
+      onDragStart?.(nearest.id, nearest.x, nearest.y, true);
     } else {
-      onDragStart(null, target.xh, target.yh, false);
+      onDragStart?.(null, target.xh, target.yh, false);
     }
     e.currentTarget.setPointerCapture(e.pointerId);
-  }, [dragging, pointerToActualTarget, findNearestShot, onDragStart]);
+  }, [readOnly, onSelectShot, dragging, pointerToActualTarget, findNearestShot, onDragStart]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (readOnly) return;
     if (!dragging) return;
     const target = pointerToActualTarget(e.clientX, e.clientY);
     if (!target) return; // outside target — stay at last valid
-    onDragMove(target.xh, target.yh);
-  }, [dragging, pointerToActualTarget, onDragMove]);
+    onDragMove?.(target.xh, target.yh);
+  }, [readOnly, dragging, pointerToActualTarget, onDragMove]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (readOnly) return;
     if (!dragging) return;
     const target = pointerToActualTarget(e.clientX, e.clientY);
     if (target) {
-      onDragEnd(target.xh, target.yh);
+      onDragEnd?.(target.xh, target.yh);
     } else {
-      onDragEnd(dragging.xh, dragging.yh);
+      onDragEnd?.(dragging.xh, dragging.yh);
     }
     e.currentTarget.releasePointerCapture(e.pointerId);
-  }, [dragging, pointerToActualTarget, onDragEnd]);
+  }, [readOnly, dragging, pointerToActualTarget, onDragEnd]);
 
   const handlePointerCancel = useCallback(() => {
+    if (readOnly) return;
     if (!dragging) return;
-    onDragCancel();
-  }, [dragging, onDragCancel]);
+    onDragCancel?.();
+  }, [readOnly, dragging, onDragCancel]);
+
+  // Direct marker hit target for readOnly selection. Attached to each shot's
+  // <g> so a tap on the marker itself always selects it, independent of the
+  // SVG-level distance hit test in handlePointerDown (kept as a fallback for
+  // taps that land just outside the marker's rendered shape, e.g. its thin
+  // outer ring stroke). stopPropagation prevents the SVG-level handler from
+  // re-running findNearestShot for the same tap.
+  const handleMarkerPointerDown = useCallback((shotId: string) => (e: React.PointerEvent) => {
+    if (!readOnly) return;
+    e.stopPropagation();
+    onSelectShot?.(shotId);
+  }, [readOnly, onSelectShot]);
 
   // Find last shot (highest shotNumber among non-dragging shots)
   const lastShot = (() => {
+    if (readOnly) return null;
     const candidates = dragging
       ? shots.filter(s => s.id !== dragging.shotId)
       : shots;
@@ -276,15 +307,20 @@ export default function TargetCanvas({
     const isLast = lastShot !== null && shot.id === lastShot.id;
     const isDragging = dragging !== null && dragging.shotId === shot.id;
     const isSelected = selectedShotId !== null && selectedShotId !== undefined && shot.id === selectedShotId && !isLast;
-    const emphasis = isDragging || isLast || isSelected;
+    const emphasis = readOnly ? isSelected : (isDragging || isLast || isSelected);
 
     const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
-    const fillColor = isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black';
+    const fillColor = readOnly
+      ? (commentedShotIds?.has(shot.id) ? '#3B82F6' : 'black')
+      : (isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black');
     const strokeColor = 'white';
     const textFill = 'white';
+    const tooltipText = readOnly ? shotTooltip?.(shot.id) : null;
+    const label = shotLabels ? shotLabels.get(shot.id) : shot.shotNumber;
 
     return (
-      <g key={shot.id}>
+      <g key={shot.id} onPointerDown={readOnly ? handleMarkerPointerDown(shot.id) : undefined}>
+        {tooltipText && <title>{tooltipText}</title>}
         <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="white" strokeWidth={0.6} />
         <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
         <text
@@ -295,7 +331,7 @@ export default function TargetCanvas({
           dominantBaseline="central"
           fontWeight="bold"
           className={styles.label}
-        >{shot.shotNumber}</text>
+        >{label}</text>
       </g>
     );
   });
