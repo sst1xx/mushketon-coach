@@ -125,13 +125,6 @@ export default function SettingsScreen({ onBack }: Props) {
         )}
       </section>
 
-      {/* Section: Анализ */}
-      <section className={s.section}>
-        <h3 className={s.sectionTitle}>Анализ</h3>
-        <div className={s.divider} />
-        <p className={s.info}>В разработке</p>
-      </section>
-
       {/* Status message */}
       {status && <p className={s.status}>{status}</p>}
 
