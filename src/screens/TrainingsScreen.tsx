@@ -3,6 +3,8 @@ import { openDB } from '../db/open';
 import { readEpoch } from '../db/tx';
 import { AthleteRecord, TrainingRecord } from '../db/schema';
 import { createTraining, listTrainings, deleteTraining } from '../domain/trainingRepo';
+import { listShots } from '../domain/shotRepo';
+import { formatTrainingTotal } from './trainingTotal';
 import Modal from '../components/Modal';
 import s from './TrainingsScreen.module.css';
 
@@ -17,11 +19,17 @@ interface Props {
 
 export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining, onOpenRemarks, onOpenAllShots }: Props) {
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
+  const [totals, setTotals] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
 
   const load = useCallback(async () => {
-    setTrainings(await listTrainings(athlete.id));
+    const list = await listTrainings(athlete.id);
+    setTrainings(list);
+    const entries = await Promise.all(
+      list.map(async (t) => [t.id, formatTrainingTotal(await listShots(t.id))] as const),
+    );
+    setTotals(Object.fromEntries(entries));
     setLoading(false);
    }, [athlete.id]);
 
@@ -69,6 +77,7 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
              <button className={s.itemTap} onClick={() => onSelectTraining(t)}>
                <div className={s.itemMain}>
                  <span className={s.date}>{formatDate(t.startedAt)}</span>
+                 <span className={s.total}>{totals[t.id] ?? '–'}</span>
                  {t.completedAt && <span className={s.badge}>Завершена</span>}
                </div>
              </button>

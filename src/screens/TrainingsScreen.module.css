@@ -113,6 +113,12 @@
   font-size: 16px;
 }
 
+.total {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
 .badge {
   font-size: 12px;
   background: var(--color-success);
