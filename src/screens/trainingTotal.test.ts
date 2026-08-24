@@ -32,7 +32,38 @@ describe('formatTrainingTotal', () => {
       makeShot({ id: 's2', score: 95 }),
       makeShot({ id: 's3', score: 100 }),
     ];
-    expect(formatTrainingTotal(shots)).toBe('30 (30.4)');
+    expect(formatTrainingTotal(shots)).toBe('29 (30.4)');
+  });
+
+  it('never lets the whole total exceed the sum of per-shot whole points (10x109)', () => {
+    const shots = Array.from({ length: 10 }, (_, i) => makeShot({ id: `s${i}`, score: 109 }));
+    expect(formatTrainingTotal(shots)).toBe('100 (109.0)');
+  });
+
+  it('sums per-shot whole points, not floor of the decimal total (7.1 + 5.1)', () => {
+    const shots = [
+      makeShot({ id: 's1', score: 71 }),
+      makeShot({ id: 's2', score: 51 }),
+    ];
+    expect(formatTrainingTotal(shots)).toBe('12 (12.2)');
+  });
+
+  it('sums per-shot whole points, not floor of the decimal total (9.9 + 9.9)', () => {
+    const shots = [
+      makeShot({ id: 's1', score: 99 }),
+      makeShot({ id: 's2', score: 99 }),
+    ];
+    expect(formatTrainingTotal(shots)).toBe('18 (19.8)');
+  });
+
+  it('handles a single shot of 1.0', () => {
+    const shots = [makeShot({ id: 's1', score: 10 })];
+    expect(formatTrainingTotal(shots)).toBe('1 (1.0)');
+  });
+
+  it('sums per-shot whole points across 60 shots of 9.5', () => {
+    const shots = Array.from({ length: 60 }, (_, i) => makeShot({ id: `s${i}`, score: 95 }));
+    expect(formatTrainingTotal(shots)).toBe('540 (570.0)');
   });
 
   it('ignores draft shots mixed in with committed ones', () => {
