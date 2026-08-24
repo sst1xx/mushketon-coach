@@ -12,6 +12,6 @@ export function formatTrainingTotal(shots: ShotRecord[]): string {
   if (committed.length === 0) return '–';
   const totalTenths = committed.reduce((sum, s) => sum + s.score, 0);
   const decimal = (totalTenths / 10).toFixed(1);
-  const whole = Math.floor(totalTenths / 10);
+  const whole = committed.reduce((sum, s) => sum + Math.floor(s.score / 10), 0);
   return `${whole} (${decimal})`;
 }
