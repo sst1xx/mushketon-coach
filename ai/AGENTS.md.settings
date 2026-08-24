@@ -8,10 +8,15 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 ## 1. Hard rules (never break)
 
 1. NEVER commit unless the user explicitly says "commit" / "закоммить". Ask before committing.
-2. NEVER deploy unless the user explicitly asks. Cloudflare Pages is the dev/staging environment used to
-   check functionality; GitHub Pages via the `main` branch is production. Deploying to Cloudflare
-   requires an explicit user request, same as a production deploy to GitHub Pages — never conflate
-   the two or treat a Cloudflare deploy as a substitute for shipping to production.
+2. NEVER deploy to GitHub Pages / production unless the user explicitly asks. Cloudflare Pages is
+   the dev/staging environment used to check functionality; GitHub Pages via the `main` branch is
+   production — these are separate targets, never conflate them or treat a Cloudflare deploy as a
+   substitute for shipping to production. Cloudflare Pages is the exception: after tests/build pass
+   for a change, `worker` deploys the current UI to the Cloudflare Pages project `mushketon-coach`
+   automatically, without asking for separate confirmation, so the user can check the UI. Do not
+   touch GitHub Actions or the GitHub Pages workflow to make this happen. If Cloudflare
+   authorization or required env vars/secrets are missing, report the deploy error instead of
+   silently skipping it or attempting a workaround.
 3. NEVER install/upgrade packages without explicit user approval.
 4. NEVER add: backend API, user accounts, cloud DB (D1/KV), analytics, CDN/fonts from other
    origins, `unsafe-inline`/`unsafe-eval` in CSP, new runtime dependencies.
@@ -40,8 +45,11 @@ npm run preview
 
 `npm test` also works. After code changes always run `npx vitest run`; run `npm run build` too if
 types could break. There is no local deploy script: pushing `main` triggers
-`.github/workflows/deploy-github-pages.yml` (production). Deploying to Cloudflare Pages (dev/staging,
-via `wrangler`) happens only on explicit user request and is separate from the production pipeline.
+`.github/workflows/deploy-github-pages.yml` (production, explicit user request only). Deploying to
+Cloudflare Pages (dev/staging, via `wrangler pages deploy dist --project-name mushketon-coach`)
+happens automatically after a successful test/build for a change, without a separate user request,
+so the user can check the UI; it stays separate from the production GitHub Pages pipeline and does
+not involve editing GitHub Actions. If Cloudflare auth or config is missing, report the failure.
 
 Test conventions:
 
@@ -164,10 +172,11 @@ Rules:
   `npx vitest run`).
 - If `worker` fails (tests/build/deploy), the coordinator fixes the handoff or the environment and
   re-runs `worker` — it does not fix the code itself.
-- Deploy and commit: only `worker`, only after a successful `reviewer` pass, only with explicit user
-  permission (see §1). Cloudflare (dev/staging) and GitHub Pages `main` (production) are separate
-  targets — deploying to one is never a substitute for or implicitly authorized by a request to
-  deploy to the other.
+- Deploy and commit: only `worker`. Committing and deploying to GitHub Pages `main` (production)
+  require explicit user permission (see §1). Deploying to Cloudflare Pages (dev/staging) happens
+  automatically after a successful test/build, without waiting for a separate user request or for
+  `reviewer`. Cloudflare and GitHub Pages `main` are separate targets — deploying to one is never a
+  substitute for or implicitly authorized by a request to deploy to the other.
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
 
 ## 8. Worktrees
