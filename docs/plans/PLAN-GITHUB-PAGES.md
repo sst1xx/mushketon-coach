@@ -1,9 +1,10 @@
 # План: Поддержка деплоя на GitHub Pages (Project Pages)
 
-**Дата:** 2025-05-18  
-**Статус:** 📋 План на согласовании (без реализации в коде)  
+**Дата:** 2025-05-18 (обновлено после реализации)  
+**Статус:** ✅ Реализовано и задеплоено  
 **URL GitHub Pages:** `https://sst1xx.github.io/mushketon-coach/`  
 **Целевой подпуть (subpath):** `/mushketon-coach/`  
+**Источник Pages в настройках репозитория (Settings → Pages → Build and deployment):** `GitHub Actions` (не `Deploy from a branch`) — при `Deploy from a branch` GitHub дополнительно запускает встроенный legacy-пайплайн `pages build and deployment` (`actions/jekyll-build-pages@v1`), который падает на симлинке `node_modules` в корне репозитория; при `Source: GitHub Actions` этот legacy-пайплайн не запускается.
 
 ---
 
@@ -60,7 +61,7 @@ const basePath = isGitHubPages ? '/mushketon-coach/' : '/';
 
 ## 3. GitHub Actions Workflow
 
-Создается файл `.github/workflows/deploy-pages.yml` со следующими характеристиками:
+Фактически используемый файл: `.github/workflows/deploy-github-pages.yml` (имя `deploy-pages.yml`, упомянутое ниже по первоначальному плану, в реализации не использовано). Характеристики совпадают с планом ниже:
 
 ### 3.1 Permissions & Environment
 ```yaml
@@ -99,7 +100,7 @@ concurrency:
 | `vite.config.ts` | Изменение | Чтение `process.env.GITHUB_PAGES`, установка `base: isGitHubPages ? '/mushketon-coach/' : '/'`, настройка `start_url` в manifest |
 | `src/main.tsx` | Изменение | Замена хардкода `/sw.js` на `${import.meta.env.BASE_URL}sw.js` при создании `Workbox` |
 | `index.html` | Проверка/изменение | Проверка резолва favicon `<link rel="icon" ...>` с учетом Vite `base` |
-| `.github/workflows/deploy-pages.yml` | Новый файл | Workflow сборки и публикации на GitHub Pages |
+| `.github/workflows/deploy-github-pages.yml` | Новый файл | Workflow сборки и публикации на GitHub Pages (фактическое имя файла; см. §3) |
 | `docs/plans/PLAN-GITHUB-PAGES.md` | Новый файл | Настоящий документ плана |
 
 *Примечание: `wrangler.toml`, `public/_headers`, база данных (`src/db/*`), доменная модель (`src/domain/*`), компоненты и тесты не модифицируются.*
@@ -114,19 +115,20 @@ concurrency:
 3. Проверить локальную сборку по умолчанию: `npm run build` → убедиться, что в `dist/index.html` пути начинаются с `/assets/...` (для Cloudflare).
 4. Проверить локальную сборку для GH Pages: `GITHUB_PAGES=true npm run build` → убедиться, что пути начинаются с `/mushketon-coach/assets/...`, manifest содержит `start_url: "/mushketon-coach/"`, Service Worker регистрирует правильный scope.
 
-### Этап 2: Создание GitHub Actions Workflow
-1. Создать `.github/workflows/deploy-pages.yml`.
-2. Настроить триггер `on: push: branches: [main]` и `workflow_dispatch` (ручной запуск).
-3. Добавить обязательный шаг тестирования перед билдом.
+### Этап 2: Создание GitHub Actions Workflow — выполнено
+1. Создан `.github/workflows/deploy-github-pages.yml`.
+2. Настроен триггер `on: push: branches: [main]` и `workflow_dispatch` (ручной запуск).
+3. Добавлен обязательный шаг тестирования перед билдом.
+4. В настройках репозитория (Settings → Pages) источник установлен на `GitHub Actions`, чтобы legacy Jekyll-пайплайн не запускался параллельно.
 
-### Этап 3: Тестирование и валидация (Smoke Check)
-1. Прогнать весь набор vitest (`npx vitest run`).
-2. Запустить `npm run preview` с проверкой обоих режимов.
-3. Проверить Service Worker lifecycle и оффлайн-кэш в subpath-окружении.
+### Этап 3: Тестирование и валидация (Smoke Check) — выполнено
+1. Прогнан весь набор vitest (`npx vitest run`) в workflow перед сборкой.
+2. Service Worker и оффлайн-кэш работают в subpath `/mushketon-coach/` на продакшен-адресе https://sst1xx.github.io/mushketon-coach/.
+3. Публикация подтверждена: workflow `Deploy to GitHub Pages` завершается успешно после каждого push в `main`, без параллельного запуска legacy Jekyll pipeline.
 
 ---
 
-## 6. Acceptance Criteria (Критерии приемки)
+## 6. Acceptance Criteria (Критерии приемки) — выполнены
 
 1. **Изоляция Cloudflare:**
    - Выполнение `npm run build` без переменных окружения формирует `dist/` с `base: '/'`.
@@ -143,7 +145,7 @@ concurrency:
    - CSP не разрешает `'unsafe-inline'` или `'unsafe-eval'`.
    - Workflow не требует внешних секретов или повышенных прав (только `pages: write`, `id-token: write`).
 5. **Тесты:**
-   - Все 290 тестов Vitest проходят без ошибок.
+   - Полный набор Vitest проходит без ошибок в workflow перед каждым деплоем (точное число тестов растёт с каждым PR и не фиксируется здесь).
 
 ---
 
@@ -159,5 +161,14 @@ concurrency:
 
 ### 7.2 Стратегия отката (Rollback)
 - **Откат в GitHub:** В настройках репозитория GitHub (*Settings -> Pages*) деактивировать GitHub Pages или переключить источник сборки на *Disabled*.
-- **Откат кода:** Удаление `.github/workflows/deploy-pages.yml` и сброс изменений в `vite.config.ts` / `src/main.tsx` мгновенно возвращает репозиторий в исходное состояние.
+- **Откат кода:** Удаление `.github/workflows/deploy-github-pages.yml` и сброс изменений в `vite.config.ts` / `src/main.tsx` мгновенно возвращает репозиторий в исходное состояние.
 - На Cloudflare Pages откат не требуется, так как продакшн-конфигурация Cloudflare не модифицируется.
+
+---
+
+## 8. Фактический исход реализации
+
+- Workflow `.github/workflows/deploy-github-pages.yml` собирает проект через Vite (`npm run build` с `GITHUB_PAGES=true`) и публикует `dist/` через `actions/upload-pages-artifact@v3` + `actions/deploy-pages@v4`.
+- В настройках репозитория (Settings → Pages → Build and deployment → Source) установлено значение `GitHub Actions`.
+- Сайт доступен по адресу https://sst1xx.github.io/mushketon-coach/.
+- Legacy встроенный пайплайн GitHub Pages `pages build and deployment` (Jekyll, `actions/jekyll-build-pages@v1`), который запускался при источнике `Deploy from a branch` и падал из-за симлинка `node_modules`, больше не запускается после переключения источника на `GitHub Actions`.
