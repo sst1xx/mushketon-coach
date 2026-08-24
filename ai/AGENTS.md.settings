@@ -8,7 +8,10 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
 ## 1. Hard rules (never break)
 
 1. NEVER commit unless the user explicitly says "commit" / "закоммить". Ask before committing.
-2. NEVER deploy unless the user explicitly asks.
+2. NEVER deploy unless the user explicitly asks. Cloudflare Pages is the dev/staging environment used to
+   check functionality; GitHub Pages via the `main` branch is production. Deploying to Cloudflare
+   requires an explicit user request, same as a production deploy to GitHub Pages — never conflate
+   the two or treat a Cloudflare deploy as a substitute for shipping to production.
 3. NEVER install/upgrade packages without explicit user approval.
 4. NEVER add: backend API, user accounts, cloud DB (D1/KV), analytics, CDN/fonts from other
    origins, `unsafe-inline`/`unsafe-eval` in CSP, new runtime dependencies.
@@ -37,7 +40,8 @@ npm run preview
 
 `npm test` also works. After code changes always run `npx vitest run`; run `npm run build` too if
 types could break. There is no local deploy script: pushing `main` triggers
-`.github/workflows/deploy-github-pages.yml`.
+`.github/workflows/deploy-github-pages.yml` (production). Deploying to Cloudflare Pages (dev/staging,
+via `wrangler`) happens only on explicit user request and is separate from the production pipeline.
 
 Test conventions:
 
@@ -65,8 +69,8 @@ public/_headers       CSP + security headers
 scripts/gen-icons.py  regenerates PWA icons
 vite.config.ts        Vite + vite-plugin-pwa (injectManifest, prompt update); base is
                       `/mushketon-coach/` for GitHub Pages, `/` otherwise
-.github/workflows/deploy-github-pages.yml   build + deploy on push to main (primary hosting)
-wrangler.toml         Cloudflare Pages (alternative static hosting, output dir dist)
+.github/workflows/deploy-github-pages.yml   build + deploy on push to main (production hosting)
+wrangler.toml         Cloudflare Pages (dev/staging hosting for checking functionality, output dir dist)
 docs/plans/PLAN.md         full spec, source of truth (RU)
 docs/plans/PLAN-*.md       per-feature plans; use docs/plans/PLAN-TARGET-ZOOM.md as template
 docs/specs/, docs/bugs/    bugfix specs and bug reports
@@ -161,7 +165,9 @@ Rules:
 - If `worker` fails (tests/build/deploy), the coordinator fixes the handoff or the environment and
   re-runs `worker` — it does not fix the code itself.
 - Deploy and commit: only `worker`, only after a successful `reviewer` pass, only with explicit user
-  permission (see §1).
+  permission (see §1). Cloudflare (dev/staging) and GitHub Pages `main` (production) are separate
+  targets — deploying to one is never a substitute for or implicitly authorized by a request to
+  deploy to the other.
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
 
 ## 8. Worktrees
