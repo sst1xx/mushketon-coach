@@ -29,6 +29,11 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
    one-off user request.
 9. NEVER name concrete models, vendors, or agent-tool APIs in this file — describe roles and
    capabilities only. Model and cost bindings belong to the agent tool's own config.
+10. When the user says "запомни эту информацию" / "запомни это поведение" (or an equivalent
+    phrasing asking to remember something), record it as a permanent rule in this file
+    (`AGENTS.md`): edit the working copy/source per the project's worktree rules in §3/§8
+    (`wt-*/ai/AGENTS.md.settings`, never `main/` directly), do not commit it unless the user
+    explicitly asks (see rule 1), and tell the user what was added/changed.
 
 ## 2. Commands
 
