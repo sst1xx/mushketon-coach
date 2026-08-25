@@ -137,13 +137,23 @@ export async function updateCoords(
 
 // ─── deleteDraft ─────────────────────────────────────────────────────────────
 
+/**
+ * Delete a draft shot and, in the same tx, reclaim its shotNumber if it was
+ * the highest number issued so far (i.e. no committed/draft shot occupies it
+ * or a higher number). This keeps a cancelled-before-commit draft from
+ * permanently consuming a shot number. `nextShotNumber` is recomputed from
+ * the actual remaining shots (max remaining shotNumber + 1) rather than
+ * blindly decremented, so it can never drop below what existing shots
+ * require, even under races with concurrent writers.
+ */
 export async function deleteDraft(id: string, clientEpoch: number): Promise<void> {
   const db = await openDB();
-  await withReadWrite(db, ['shots'], clientEpoch, (tx) => {
+  await withReadWrite(db, ['shots', 'trainings'], clientEpoch, (tx) => {
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
-      const get = tx.objectStore('shots').get(id);
+      const shotsStore = tx.objectStore('shots');
+      const get = shotsStore.get(id);
       get.onsuccess = () => {
         const s = get.result as ShotRecord | undefined;
         if (!s) { reject(new Error('Shot not found')); return; }
@@ -152,7 +162,25 @@ export async function deleteDraft(id: string, clientEpoch: number): Promise<void
           reject(new Error('Can only delete draft shots'));
           return;
           }
-        tx.objectStore('shots').delete(id);
+        shotsStore.delete(id);
+        const allReq = shotsStore.index('trainingId').getAll(s.trainingId);
+        allReq.onsuccess = () => {
+          const remaining = (allReq.result as ShotRecord[]).filter((r) => r.id !== id);
+          const maxShotNumber = remaining.reduce((mx, r) => Math.max(mx, r.shotNumber), 0);
+          const trGet = tx.objectStore('trainings').get(s.trainingId);
+          trGet.onsuccess = () => {
+            const tr = trGet.result as TrainingRecord | undefined;
+            if (tr) {
+              const reclaimedNext = maxShotNumber + 1;
+              if (reclaimedNext < tr.nextShotNumber) {
+                tr.nextShotNumber = reclaimedNext;
+                tx.objectStore('trainings').put(tr);
+              }
+            }
+          };
+          trGet.onerror = () => reject(trGet.error);
+        };
+        allReq.onerror = () => reject(allReq.error);
         };
       get.onerror = () => reject(get.error);
       });
@@ -161,12 +189,46 @@ export async function deleteDraft(id: string, clientEpoch: number): Promise<void
 
 // ─── deleteCommittedShotForUndo ──────────────────────────────────────────────
 
+/**
+ * Delete a committed shot (used for Undo) and, in the same tx, reclaim its
+ * shotNumber if it was the highest number issued so far. `nextShotNumber` is
+ * recomputed from the actual remaining shots (max remaining shotNumber + 1)
+ * rather than blindly decremented, so it can never drop below what existing
+ * shots require, even under races with concurrent writers. This mirrors the
+ * reclaim behaviour of `deleteDraft` so that repeated Undo of the most
+ * recent shot does not leave gaps in shot numbering.
+ */
 export async function deleteCommittedShotForUndo(id: string, clientEpoch: number): Promise<void> {
   const db = await openDB();
-  await withReadWrite(db, ['shots'], clientEpoch, (tx) => new Promise<void>((resolve, reject) => {
+  await withReadWrite(db, ['shots', 'trainings'], clientEpoch, (tx) => new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.objectStore('shots').delete(id);
+    const shotsStore = tx.objectStore('shots');
+    const get = shotsStore.get(id);
+    get.onsuccess = () => {
+      const s = get.result as ShotRecord | undefined;
+      if (!s) { reject(new Error('Shot not found')); return; }
+      shotsStore.delete(id);
+      const allReq = shotsStore.index('trainingId').getAll(s.trainingId);
+      allReq.onsuccess = () => {
+        const remaining = (allReq.result as ShotRecord[]).filter((r) => r.id !== id);
+        const maxShotNumber = remaining.reduce((mx, r) => Math.max(mx, r.shotNumber), 0);
+        const trGet = tx.objectStore('trainings').get(s.trainingId);
+        trGet.onsuccess = () => {
+          const tr = trGet.result as TrainingRecord | undefined;
+          if (tr) {
+            const reclaimedNext = maxShotNumber + 1;
+            if (reclaimedNext < tr.nextShotNumber) {
+              tr.nextShotNumber = reclaimedNext;
+              tx.objectStore('trainings').put(tr);
+            }
+          }
+        };
+        trGet.onerror = () => reject(trGet.error);
+      };
+      allReq.onerror = () => reject(allReq.error);
+    };
+    get.onerror = () => reject(get.error);
   }));
 }
 
@@ -174,11 +236,13 @@ export async function deleteCommittedShotForUndo(id: string, clientEpoch: number
 
 /**
  * Delete the most recently created shot of a training (the one with the
- * highest shotNumber — the counter is monotonic and never renumbered).
+ * highest shotNumber).
  *
  * Returns true when a shot was deleted, false when the training has no shots
- * (no-op). TrainingRecord.nextShotNumber is intentionally left untouched so
- * that shot numbers stay stable (monotonic design decision).
+ * (no-op). TrainingRecord.nextShotNumber is reclaimed down to
+ * `max(remaining shotNumber) + 1` in the same tx as the delete (see
+ * `deleteCommittedShotForUndo`), so repeated Undo of the last shot keeps
+ * subsequent shot numbers contiguous instead of leaving gaps.
  */
 export async function undoLastShot(
   trainingId: string,

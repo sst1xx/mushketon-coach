@@ -39,17 +39,43 @@ async function mkShot(
   y: number,
   score_: number,
   status: 'draft' | 'committed',
+  shotNumber = 1,
 ) {
   const now = new Date().toISOString();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction('shots', 'readwrite');
     tx.objectStore('shots').put({
-      id, trainingId, shotNumber: 1,
+      id, trainingId, shotNumber,
       x, y, score: score_, status, createdAt: now, updatedAt: now,
      });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
      });
+}
+
+async function setNextShotNumber(db: IDBDatabase, trainingId: string, nextShotNumber: number) {
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('trainings', 'readwrite');
+    const store = tx.objectStore('trainings');
+    const get = store.get(trainingId);
+    get.onsuccess = () => {
+      const tr = get.result;
+      tr.nextShotNumber = nextShotNumber;
+      store.put(tr);
+    };
+    get.onerror = () => reject(get.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getTrainingRecord(db: IDBDatabase, id: string) {
+  return new Promise<any>((resolve, reject) => {
+    const tx = db.transaction('trainings', 'readonly');
+    const req = tx.objectStore('trainings').get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
 async function countStore(db: IDBDatabase, store: string): Promise<number> {
@@ -171,6 +197,34 @@ describe('IndexedDB persistence layer', () => {
     expect(await countStore(db, 'shots')).toBe(1);
     expect(await getShot(db, 's-draft')).toBeUndefined();
     expect(await getShot(db, 's-comm')).not.toBeUndefined();
+     });
+
+    // ── 3b: startup cleanup reclaims nextShotNumber after deleting leftover drafts ──
+  it('runStartupCleanup deletes leftover drafts (11..14) and reclaims nextShotNumber so the next createDraft gets 11, not 15', async () => {
+    await mkAthlete(db, 'a1', 'Test');
+    await mkTraining(db, 't1', 'a1');
+    for (let i = 1; i <= 10; i++) {
+      await mkShot(db, `s-committed-${i}`, 't1', 100 + i, 200, 90, 'committed', i);
+    }
+    for (let i = 11; i <= 14; i++) {
+      await mkShot(db, `s-draft-${i}`, 't1', 100 + i, 200, 90, 'draft', i);
+    }
+    await setNextShotNumber(db, 't1', 15);
+
+    await runStartupCleanup(db);
+    expect(await countStore(db, 'shots')).toBe(10);
+    for (let i = 11; i <= 14; i++) {
+      expect(await getShot(db, `s-draft-${i}`)).toBeUndefined();
+    }
+
+    const tr = await getTrainingRecord(db, 't1');
+    expect(tr.nextShotNumber).toBe(11);
+
+    const { readEpoch } = await import('./tx');
+    const { createDraft } = await import('../domain/shotRepo');
+    const epoch = (await readEpoch(db)) as number;
+    const nextDraft = await createDraft('t1', 500, 600, epoch);
+    expect(nextDraft.shotNumber).toBe(11);
      });
 
     // ── 4: orphan shot deleted ──

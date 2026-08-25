@@ -24,15 +24,47 @@ async function collectKeys(db: IDBDatabase, store: string): Promise<Set<string>>
 }
 
 export async function runStartupCleanup(db: IDBDatabase): Promise<void> {
-    // 1. Delete draft shots
+    // 1. Delete draft shots and, in the same transaction, reclaim
+    // TrainingRecord.nextShotNumber for every affected training down to
+    // max(remaining committed shotNumber) + 1. Without this, drafts left
+    // over from an interrupted session (e.g. app closed mid-drag) get wiped
+    // on next startup but the counter stays inflated, so freshly created
+    // shots skip ahead (e.g. jump to 11 after only 10 committed shots).
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('shots', 'readwrite');
+    const tx = db.transaction(['shots', 'trainings'], 'readwrite');
     const store = tx.objectStore('shots');
+    const maxRemainingByTraining = new Map<string, number>();
+    const affectedTrainingIds = new Set<string>();
     const req = store.openCursor();
     req.onsuccess = () => {
       const cursor = req.result;
-      if (!cursor) return;
-      if ((cursor.value as any).status === 'draft') cursor.delete();
+      if (!cursor) {
+        // All shots scanned; reclaim nextShotNumber for trainings that had a draft deleted.
+        if (affectedTrainingIds.size === 0) return;
+        const trainingsStore = tx.objectStore('trainings');
+        for (const trainingId of affectedTrainingIds) {
+          const trGet = trainingsStore.get(trainingId);
+          trGet.onsuccess = () => {
+            const tr = trGet.result as any;
+            if (!tr) return;
+            const reclaimedNext = (maxRemainingByTraining.get(trainingId) ?? 0) + 1;
+            if (reclaimedNext < tr.nextShotNumber) {
+              tr.nextShotNumber = reclaimedNext;
+              trainingsStore.put(tr);
+            }
+          };
+          trGet.onerror = () => reject(trGet.error);
+        }
+        return;
+      }
+      const shot = cursor.value as any;
+      if (shot.status === 'draft') {
+        affectedTrainingIds.add(shot.trainingId);
+        cursor.delete();
+      } else {
+        const prevMax = maxRemainingByTraining.get(shot.trainingId) ?? 0;
+        if (shot.shotNumber > prevMax) maxRemainingByTraining.set(shot.trainingId, shot.shotNumber);
+      }
       cursor.continue();
        };
     tx.oncomplete = () => resolve();
