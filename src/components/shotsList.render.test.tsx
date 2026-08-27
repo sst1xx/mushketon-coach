@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ShotsList from './ShotsList';
 import type { ShotRecord } from '../db/schema';
+import { getPp3ViewedShots } from '../domain/trainingMode';
 
 function shot(overrides: Partial<ShotRecord>): ShotRecord {
   return {
@@ -72,5 +73,26 @@ describe('ShotsList', () => {
     expect(all).toContain('№1 • 10.5');
     expect(all).toContain('№2 • 0.0');
     expect(all).not.toContain('№3');
+  });
+
+  it('when fed a ПП-3 viewed-series slice (regression: mobile screen must not show all 60 shots), only that series\' shots appear', () => {
+    // 30 committed shots across 3 ПП-3 series; the bug was passing the full,
+    // unfiltered exercise `shots` array into ShotsList instead of the
+    // series-filtered slice already computed for TargetCanvas.
+    const allShots = Array.from({ length: 30 }, (_, i) =>
+      shot({ id: `s${i + 1}`, shotNumber: i + 1, score: 100 }),
+    );
+    const series2 = getPp3ViewedShots(allShots, 2); // shotNumber 11..20
+    expect(series2.map((s) => s.shotNumber)).toEqual(Array.from({ length: 10 }, (_, i) => i + 11));
+
+    const left = renderToStaticMarkup(<ShotsList shots={series2} side="left" />);
+    const right = renderToStaticMarkup(<ShotsList shots={series2} side="right" />);
+    for (let n = 11; n <= 15; n++) expect(left).toContain(`№${n} • `);
+    for (let n = 16; n <= 20; n++) expect(right).toContain(`№${n} • `);
+    // Shots from series 1 and series 3 must not leak into either column.
+    for (const n of [1, 5, 10, 21, 25, 30]) {
+      expect(left).not.toContain(`№${n} •`);
+      expect(right).not.toContain(`№${n} •`);
+    }
   });
 });

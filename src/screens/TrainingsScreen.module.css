@@ -144,6 +144,12 @@
   transform: scale(0.97);
 }
 
+.newActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .addBtn {
   width: 100%;
   padding: 12px;
@@ -154,6 +160,12 @@
   cursor: pointer;
   color: var(--color-text-muted);
   min-height: var(--touch-target-min);
+}
+
+.modeLabel {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 .warn {

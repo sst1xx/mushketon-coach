@@ -13,12 +13,21 @@ import {
 import {
   createTraining,
   completeTraining,
+  getTraining,
   shouldCompleteTrainingAfterShot,
 } from '../domain/trainingRepo';
 import TargetCanvas from '../components/TargetCanvas';
 import ShotsList from '../components/ShotsList';
 import { formatTrainingTotal } from './trainingTotal';
 import { getSetting, setSetting } from '../db/settings';
+import {
+  getTrainingMode,
+  getPp3SeriesBlocks,
+  getPp3CurrentSeriesNumber,
+  getPp3CanvasShots,
+  resolvePp3ViewedSeriesNumber,
+  isViewingPastPp3Series,
+} from '../domain/trainingMode';
 import {
   createComment,
   listCommentsByShot,
@@ -60,6 +69,10 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const [commentText, setCommentText] = useState('');
   // Completed limit warning modal
   const [showCompletedModal, setShowCompletedModal] = useState(false);
+  // "Начать новую" choice modal: "+ Новая серия" / "+ Новое упражнение"
+  const [showNewChoiceModal, setShowNewChoiceModal] = useState(false);
+  // ПП-3 series chip picked to view/edit; null falls back to the current series
+  const [selectedSeriesView, setSelectedSeriesView] = useState<number | null>(null);
   // Commit confirmation toast ("№N • 10.4") shown briefly after each committed shot
   const [toast, setToast] = useState<string | null>(null);
 
@@ -79,6 +92,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       const loaded = await listShots(training.id);
       setShots(loaded);
       setSelectedShotId(null);
+      setSelectedSeriesView(null);
       const db = await openDB();
       const zm = await getSetting(db, 'targetZoomMode');
       if (zm === 'zoom7' || zm === 'zoom9' || zm === 'full') setZoomMode(zm);
@@ -93,6 +107,33 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const isCompleted = Boolean(currentTraining.completedAt);
   const isLimited = typeof currentTraining.targetShotCount === 'number' && currentTraining.targetShotCount > 0;
   const limit = currentTraining.targetShotCount ?? null;
+  const mode = getTrainingMode(currentTraining);
+  const committedShots = shots.filter(s => s.status === 'committed');
+  // The series shown on the target lags behind committedCount on purpose:
+  // it switches only once a shot (draft or committed) beyond the current
+  // block's 10 actually appears, so the 10th shot of a block stays visible
+  // and editable instead of vanishing the instant it is committed.
+  const maxShotNumber = shots.length > 0 ? Math.max(...shots.map(s => s.shotNumber)) : 0;
+  const pp3CurrentSeries = mode === 'pp3' ? getPp3CurrentSeriesNumber(maxShotNumber) : null;
+  const pp3Blocks = mode === 'pp3' && pp3CurrentSeries !== null ? getPp3SeriesBlocks(committedShots, pp3CurrentSeries) : null;
+  // ПП-3 shows one series at a time on the target: after each completed ten,
+  // the visual target switches to the next block instead of accumulating all
+  // 60 shots on a single screen (see PLAN-TRAINING-MODES.md §2). The overall
+  // exercise stays one record — this only filters what TargetCanvas renders.
+  const viewedSeries = mode === 'pp3' && pp3CurrentSeries !== null
+    ? resolvePp3ViewedSeriesNumber(selectedSeriesView, pp3CurrentSeries)
+    : null;
+  const isViewingPastSeries = mode === 'pp3' && pp3CurrentSeries !== null
+    && isViewingPastPp3Series(selectedSeriesView, pp3CurrentSeries);
+  const canvasShots = (() => {
+    if (mode !== 'pp3' || viewedSeries === null) return shots;
+    return getPp3CanvasShots(shots, viewedSeries, isCompleted, selectedSeriesView);
+  })();
+  const headerProgressLabel = (() => {
+    if (mode === 'series') return `Серия · ${committedCount}/${limit}`;
+    if (mode === 'pp3') return `Серия ${pp3CurrentSeries}/6 · ${committedCount}/${limit}`;
+    return isLimited ? `Выстрелы: ${committedCount} / ${limit}` : `Выстрелы: ${committedCount}`;
+  })();
 
   // Score display
   const displayScore = (() => {
@@ -110,6 +151,9 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     if (!isExisting) {
       if (isCompleted) return;
       if (isLimited && committedCount >= limit!) return;
+      // New shots always belong to the currently active series, never to a
+      // completed series being viewed for editing (see PLAN-TRAINING-MODES.md).
+      if (isViewingPastSeries) return;
     }
 
     const db = await openDB();
@@ -183,17 +227,26 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       const updated = await listShots(currentTraining.id);
       setShots(updated);
       setSelectedShotId(prev => (prev && updated.some(s => s.id === prev) ? prev : null));
+      // Undo can move the current series boundary backwards; always fall
+      // back to the (now updated) current series rather than keep viewing
+      // a stale selection.
+      setSelectedSeriesView(null);
+      // Undo may reopen a training that was auto-completed by reaching its
+      // limit (see deleteCommittedShotForUndo) — pick up the fresh record.
+      const refreshedTraining = await getTraining(currentTraining.id);
+      if (refreshedTraining) setCurrentTraining(refreshedTraining);
     } finally {
       setBusy(false);
     }
   };
 
   // Create new training for the current athlete
-  const handleCreateNewTraining = async () => {
+  const handleCreateNewTraining = async (targetShotCount: number) => {
     const db = await openDB();
     const ep = await readEpoch(db);
-    const newT = await createTraining(athlete.id, ep);
+    const newT = await createTraining(athlete.id, ep, targetShotCount);
     setShowCompletedModal(false);
+    setShowNewChoiceModal(false);
     if (onNewTraining) {
       onNewTraining(newT);
     } else {
@@ -249,22 +302,54 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       <div className={s.header}>
         <button className={s.back} onClick={onBack}>◀ Назад</button>
         <span className={s.athleteName}>{athlete.name}</span>
-        <span className={s.shotNum}>
-          {isLimited ? `Выстрелы: ${committedCount} / ${limit}` : `Выстрелы: ${committedCount}`}
-        </span>
+        <span className={s.shotNum}>{headerProgressLabel}</span>
       </div>
 
-      {/* Completed notification banner (status only; the action lives in the fixed-width toolbar below) */}
-      {isCompleted && (
+      {/* Completed / ПП-3 progress banner (status only; the action lives in the fixed-width toolbar below) */}
+      {(isCompleted || mode === 'pp3') && (
         <div className={s.completedBanner}>
-          <span className={s.completedBannerText}>Тренировка завершена</span>
+          <span className={s.completedBannerText}>
+            {isCompleted
+              ? (mode === 'pp3' ? 'Упражнение ПП-3 завершено' : mode === 'series' ? 'Серия завершена' : 'Тренировка завершена')
+              : `ПП-3 · Серия ${pp3CurrentSeries} из 6`}
+          </span>
+          {pp3Blocks && (
+            <div className={s.seriesBlocksRow}>
+              {pp3Blocks.map(b => {
+                const isViewed = viewedSeries === b.index;
+                const canView = b.committedCount > 0;
+                const label = `${b.index}: ${b.committedCount}/10${b.committedCount === 10 ? ` · ${formatTrainingTotal(b.shots)}` : ''}`;
+                return (
+                  <button
+                    key={b.index}
+                    type="button"
+                    className={`${s.seriesChip} ${b.isCurrent ? s.seriesChipCurrent : ''} ${isViewed && !b.isCurrent ? s.seriesChipViewed : ''}`}
+                    disabled={!canView}
+                    onClick={() => setSelectedSeriesView(b.isCurrent ? null : b.index)}
+                    aria-pressed={isViewed}
+                    aria-label={`Серия ${b.index}${isViewed ? ', просмотр' : ''}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {isViewingPastSeries && (
+            <div className={s.viewingPastNotice}>
+              <span>Просмотр серии {viewedSeries} (только редактирование)</span>
+              <button type="button" className={s.returnToCurrentBtn} onClick={() => setSelectedSeriesView(null)}>
+                К текущей серии
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Target + commit confirmation toast */}
       <div className={s.targetWrap}>
         <TargetCanvas
-          shots={shots}
+          shots={canvasShots}
           dragging={dragging}
           selectedShotId={selectedShotId}
           zoomMode={zoomMode}
@@ -276,13 +361,15 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         {toast && <div className={s.toast}>{toast}</div>}
       </div>
 
-      {/* Shot history (left column) + score + shot history (right column) */}
+      {/* Shot history (left column) + score + shot history (right column). For ПП-3
+          these show only the currently viewed series (see canvasShots above), not
+          every shot of the exercise — matching what TargetCanvas renders. */}
       <div className={s.shotsListWrapLeft}>
-        <ShotsList shots={shots} side="left" />
+        <ShotsList shots={canvasShots} side="left" />
       </div>
       <div className={s.scoreDisplay}>{displayScore}</div>
       <div className={s.shotsListWrapRight}>
-        <ShotsList shots={shots} side="right" />
+        <ShotsList shots={canvasShots} side="right" />
       </div>
 
       {/* Training total: whole-point sum and ISSF decimal sum, committed shots only */}
@@ -328,10 +415,10 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         {isCompleted ? (
           <button
             className={`${s.slotBtn} ${s.slotBtnPrimary}`}
-            onClick={handleCreateNewTraining}
-            aria-label="Новая тренировка"
+            onClick={() => setShowNewChoiceModal(true)}
+            aria-label="Начать новую"
           >
-            + Новая тренировка
+            Начать новую
           </button>
         ) : (
           <button
@@ -351,13 +438,26 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         onClose={() => setShowCompletedModal(false)}
         actions={[
           { label: 'Просмотр', onClick: () => setShowCompletedModal(false) },
-          { label: '+ Новая тренировка', onClick: handleCreateNewTraining },
+          { label: 'Начать новую', onClick: () => { setShowCompletedModal(false); setShowNewChoiceModal(true); } },
         ]}
       >
-        <p className={s.dialogHeading}>Тренировка завершена</p>
+        <p className={s.dialogHeading}>{mode === 'pp3' ? 'упражнение ПП-3 завершено' : 'серия завершена'}</p>
         <p className={s.dialogInfo}>
           Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
         </p>
+      </Modal>
+
+      {/* "Начать новую" choice: two vertical actions per PLAN-TRAINING-MODES.md §1 */}
+      <Modal
+        isOpen={showNewChoiceModal}
+        onClose={() => setShowNewChoiceModal(false)}
+        actions={[{ label: 'Отмена', onClick: () => setShowNewChoiceModal(false) }]}
+      >
+        <p className={s.dialogHeading}>Начать новую</p>
+        <div className={s.newChoiceActions}>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(10)}>+ Новая серия</button>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(60)}>+ Новое упражнение</button>
+        </div>
       </Modal>
 
       {/* Comment modal */}

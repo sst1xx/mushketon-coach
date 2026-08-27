@@ -5,6 +5,7 @@ import { AthleteRecord, TrainingRecord } from '../db/schema';
 import { createTraining, listTrainings, deleteTraining } from '../domain/trainingRepo';
 import { listShots } from '../domain/shotRepo';
 import { formatTrainingTotal } from './trainingTotal';
+import { getTrainingListLabel } from '../domain/trainingMode';
 import Modal from '../components/Modal';
 import s from './TrainingsScreen.module.css';
 
@@ -20,6 +21,7 @@ interface Props {
 export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraining, onOpenRemarks, onOpenAllShots }: Props) {
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
   const [totals, setTotals] = useState<Record<string, string>>({});
+  const [modeLabels, setModeLabels] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
 
@@ -27,18 +29,23 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
     const list = await listTrainings(athlete.id);
     setTrainings(list);
     const entries = await Promise.all(
-      list.map(async (t) => [t.id, formatTrainingTotal(await listShots(t.id))] as const),
+      list.map(async (t) => {
+        const shots = await listShots(t.id);
+        const committedCount = shots.filter(s => s.status === 'committed').length;
+        return [t.id, formatTrainingTotal(shots), getTrainingListLabel(t, committedCount)] as const;
+      }),
     );
-    setTotals(Object.fromEntries(entries));
+    setTotals(Object.fromEntries(entries.map(([id, total]) => [id, total])));
+    setModeLabels(Object.fromEntries(entries.map(([id, , label]) => [id, label])));
     setLoading(false);
    }, [athlete.id]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleNew = async () => {
+  const handleNew = async (targetShotCount: number) => {
     const db = await openDB();
     const ep = await readEpoch(db);
-    const newTraining = await createTraining(athlete.id, ep);
+    const newTraining = await createTraining(athlete.id, ep, targetShotCount);
     onSelectTraining(newTraining);
    };
 
@@ -80,6 +87,7 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
                  <span className={s.total}>{totals[t.id] ?? '–'}</span>
                  {t.completedAt && <span className={s.badge}>Завершена</span>}
                </div>
+               {modeLabels[t.id] && <div className={s.modeLabel}>{modeLabels[t.id]}</div>}
              </button>
              <div className={s.itemActions}>
                <button className={s.delBtn} onClick={() => setConfirmDelete(t)} aria-label="Удалить">✕</button>
@@ -88,7 +96,10 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
          ))}
        </ul>
 
-       <button className={s.addBtn} onClick={handleNew}>+ Новая тренировка</button>
+       <div className={s.newActions}>
+         <button className={s.addBtn} onClick={() => handleNew(10)}>+ Новая серия</button>
+         <button className={s.addBtn} onClick={() => handleNew(60)}>+ Новое упражнение</button>
+       </div>
 
        <Modal
          isOpen={confirmDelete !== null}

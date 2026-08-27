@@ -122,6 +122,7 @@
 .completedBanner {
   grid-area: banner;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 6px 16px;
@@ -134,6 +135,83 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-main);
+}
+
+.seriesBlocksRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+
+.seriesChip {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.seriesChip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.seriesChipCurrent {
+  color: var(--color-text-main);
+  font-weight: 600;
+}
+
+.seriesChipViewed {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.viewingPastNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.returnToCurrentBtn {
+  font-size: 12px;
+  padding: 2px 8px;
+  min-height: 0;
+  border-radius: 4px;
+  border: 1px solid var(--color-primary);
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.newChoiceActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.newChoiceBtn {
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: 10px 16px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.newChoiceBtn:active {
+  background: var(--color-primary-active);
+  transform: scale(0.97);
 }
 
 /* Fixed 3-slot toolbar: left/center/right slots stay equal width across the

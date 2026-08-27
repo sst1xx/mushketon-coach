@@ -197,6 +197,12 @@ export async function deleteDraft(id: string, clientEpoch: number): Promise<void
  * shots require, even under races with concurrent writers. This mirrors the
  * reclaim behaviour of `deleteDraft` so that repeated Undo of the most
  * recent shot does not leave gaps in shot numbering.
+ *
+ * If the training was auto-completed by reaching its `targetShotCount` limit
+ * and this undo drops the committed count back below that limit, the
+ * training is reopened (`completedAt` cleared) in the same tx, so Undo of
+ * the last shot of a finished series/ПП-3 makes the record active again for
+ * input (PLAN-TRAINING-MODES.md §"Зафиксированные решения").
  */
 export async function deleteCommittedShotForUndo(id: string, clientEpoch: number): Promise<void> {
   const db = await openDB();
@@ -213,15 +219,23 @@ export async function deleteCommittedShotForUndo(id: string, clientEpoch: number
       allReq.onsuccess = () => {
         const remaining = (allReq.result as ShotRecord[]).filter((r) => r.id !== id);
         const maxShotNumber = remaining.reduce((mx, r) => Math.max(mx, r.shotNumber), 0);
+        const committedRemaining = remaining.filter((r) => r.status === 'committed').length;
         const trGet = tx.objectStore('trainings').get(s.trainingId);
         trGet.onsuccess = () => {
           const tr = trGet.result as TrainingRecord | undefined;
           if (tr) {
+            let changed = false;
             const reclaimedNext = maxShotNumber + 1;
             if (reclaimedNext < tr.nextShotNumber) {
               tr.nextShotNumber = reclaimedNext;
-              tx.objectStore('trainings').put(tr);
+              changed = true;
             }
+            const isLimited = typeof tr.targetShotCount === 'number' && tr.targetShotCount > 0;
+            if (tr.completedAt && isLimited && committedRemaining < tr.targetShotCount!) {
+              tr.completedAt = null;
+              changed = true;
+            }
+            if (changed) tx.objectStore('trainings').put(tr);
           }
         };
         trGet.onerror = () => reject(trGet.error);

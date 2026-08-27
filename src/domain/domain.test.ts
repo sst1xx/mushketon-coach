@@ -379,6 +379,51 @@ describe('shotRepo', () => {
     await expect(createDraft(tLim.id, 120, 200, epoch)).rejects.toThrow(/completed/i);
   });
 
+  it('ПП-3 (targetShotCount=60): does not complete at series boundaries (10,20,30,40,50), completes at 60, blocks the 61st shot, and Undo of the 60th re-enables input at 59/60', async () => {
+    const tPp3 = await createTraining((await createAthlete('Pp3')).id, epoch, 60);
+    expect(tPp3.completedAt).toBeNull();
+
+    for (let i = 1; i <= 59; i++) {
+      const d = await createDraft(tPp3.id, 100 + (i % 50), 200, epoch);
+      await commitShot(d.id, 100 + (i % 50), 200, epoch);
+      if (i % 10 === 0) {
+        // Series boundary (10/20/30/40/50): must NOT auto-complete the exercise.
+        const shots = await listShots(tPp3.id);
+        const committedCount = shots.filter(s => s.status === 'committed').length;
+        expect(shouldCompleteTrainingAfterShot(tPp3, committedCount)).toBe(false);
+        const stillOpen = await getTraining(tPp3.id);
+        expect(stillOpen?.completedAt).toBeNull();
+      }
+    }
+
+    // 60th shot completes the exercise.
+    const d60 = await createDraft(tPp3.id, 110, 200, epoch);
+    await commitShot(d60.id, 110, 200, epoch);
+    const shots60 = await listShots(tPp3.id);
+    const count60 = shots60.filter(s => s.status === 'committed').length;
+    expect(count60).toBe(60);
+    expect(shouldCompleteTrainingAfterShot(tPp3, count60)).toBe(true);
+    const completedPp3 = await completeTraining(tPp3.id, epoch);
+    expect(completedPp3.completedAt).not.toBeNull();
+
+    // 61st shot is rejected: the exercise is completed.
+    await expect(createDraft(tPp3.id, 120, 200, epoch)).rejects.toThrow(/completed/i);
+
+    // Undo of the last (60th) shot returns the exercise to 59/60 and re-enables
+    // input: the record is reopened (completedAt cleared) in the same tx.
+    expect(await undoLastShot(tPp3.id, epoch)).toBe(true);
+    const afterUndo = await listShots(tPp3.id);
+    expect(afterUndo.filter(s => s.status === 'committed')).toHaveLength(59);
+    const reopened = await getTraining(tPp3.id);
+    expect(reopened?.completedAt).toBeNull();
+
+    // Input is allowed again: the 60th shot can be re-taken.
+    const d60again = await createDraft(tPp3.id, 111, 200, epoch);
+    await commitShot(d60again.id, 111, 200, epoch);
+    const finalShots = await listShots(tPp3.id);
+    expect(finalShots.filter(s => s.status === 'committed')).toHaveLength(60);
+  });
+
   it('pure seam shouldCompleteTrainingAfterShot respects legacy and unlimited trainings', () => {
     const now = new Date().toISOString();
     // Legacy training without targetShotCount field
