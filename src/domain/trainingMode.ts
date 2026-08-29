@@ -132,6 +132,57 @@ export function isViewingPastPp3Series(selectedView: number | null, currentSerie
 }
 
 /**
+ * Header/title label for the scoped «Дневник» screen reachable from
+ * TrainingScreen (see PLAN-DIARY-IA.md §2): distinguishes a standalone
+ * series, a whole ПП-3 exercise (no series picked), or one specific ПП-3
+ * series (`seriesNumber` set) so the button/title is never ambiguous about
+ * what scope it opens. «Дневник» is the list/navigation term; «Замечание»
+ * (singular) stays reserved for a single piece of text.
+ */
+export function getScopedRemarksLabel(
+  training: Pick<TrainingRecord, 'targetShotCount'>,
+  seriesNumber: number | null,
+): string {
+  const mode = getTrainingMode(training);
+  if (mode === 'pp3') {
+    return seriesNumber !== null ? `Дневник · Серия ${seriesNumber}` : 'Дневник · Упражнение';
+  }
+  if (mode === 'series') return 'Дневник · Серия';
+  return 'Дневник';
+}
+
+/**
+ * Shot-number range (inclusive) that the scoped «Замечания» screen should
+ * show: a ПП-3 series' own 10-shot window when `seriesNumber` is set,
+ * otherwise the whole training (from shot 1 to `Infinity`).
+ */
+export function getScopedRemarksShotNumberRange(
+  training: Pick<TrainingRecord, 'targetShotCount'>,
+  seriesNumber: number | null,
+): { start: number; end: number } {
+  const mode = getTrainingMode(training);
+  if (mode === 'pp3' && seriesNumber !== null) {
+    return getPp3SeriesShotNumberRange(seriesNumber);
+  }
+  return { start: 1, end: Infinity };
+}
+
+/**
+ * Splits a ПП-3 exercise's shots into its 6 fixed 10-shot series windows
+ * (see `getPp3SeriesShotNumberRange`), for building per-series summaries in
+ * the diary/scoped-remarks screens (see PLAN-DIARY-IA.md §5/§6). Includes
+ * both committed and draft shots — callers filter by `status` as needed.
+ */
+export function getPp3SeriesShotGroups(shots: ShotRecord[]): { index: number; shots: ShotRecord[] }[] {
+  const groups: { index: number; shots: ShotRecord[] }[] = [];
+  for (let index = 1; index <= PP3_SERIES_COUNT; index++) {
+    const { start, end } = getPp3SeriesShotNumberRange(index);
+    groups.push({ index, shots: shots.filter(sh => sh.shotNumber >= start && sh.shotNumber <= end) });
+  }
+  return groups;
+}
+
+/**
  * Short mode+progress label for the trainings list (§4 of the plan). Returns
  * `null` for legacy unlimited records so the list keeps its previous,
  * backward-compatible display for them.

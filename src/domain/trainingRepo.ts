@@ -1,6 +1,7 @@
 import { openDB } from '../db/open';
 import { withReadWrite } from '../db/tx';
 import type { TrainingRecord, ShotRecord } from '../db/schema';
+import { cascadeDeleteSeriesCommentsInTx } from './seriesCommentRepo';
 
 /**
  * Pure helper to check whether a training has reached its shot limit and should be completed.
@@ -105,7 +106,7 @@ export async function deleteTraining(
   clientEpoch: number,
 ): Promise<void> {
   const db = await openDB();
-  await withReadWrite(db, ['trainings', 'shots'], clientEpoch, (tx) => {
+  await withReadWrite(db, ['trainings', 'shots', 'generalComments', 'seriesComments'], clientEpoch, (tx) => {
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -118,6 +119,13 @@ export async function deleteTraining(
         tx.objectStore('trainings').delete(id);
       };
       shGet.onerror = () => reject(shGet.error);
+
+      // General comment is keyed by trainingId itself, so it cascade-deletes
+      // directly without needing an index lookup.
+      tx.objectStore('generalComments').delete(id);
+
+      // Series comments (ПП-3) cascade via the trainingId index.
+      cascadeDeleteSeriesCommentsInTx(tx, id);
       });
      });
 }

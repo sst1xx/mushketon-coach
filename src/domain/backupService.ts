@@ -5,6 +5,8 @@ import {
    ShotRecord,
    SettingsRecord,
    CommentRecord,
+   GeneralCommentRecord,
+   SeriesCommentRecord,
    STORES,
   } from '../db/schema';
 import { score as recomputeScore, SCORING_VERSION } from '../scoring';
@@ -26,6 +28,8 @@ export interface BackupFile {
   trainings: TrainingRecord[];
   shots: ShotRecord[];
   comments: CommentRecord[];
+  generalComments: GeneralCommentRecord[];
+  seriesComments: SeriesCommentRecord[];
   settings: BackupSettings;
 }
 
@@ -37,15 +41,19 @@ export async function exportBackup(): Promise<BackupFile> {
   let trainings: TrainingRecord[] = [];
   let shots: ShotRecord[] = [];
   let comments: CommentRecord[] = [];
+  let generalComments: GeneralCommentRecord[] = [];
+  let seriesComments: SeriesCommentRecord[] = [];
   let settings!: BackupSettings;
 
-  // One readonly transaction over all 5 stores
+  // One readonly transaction over all stores
   await new Promise<void>((resolve, reject) => {
      const tx = db.transaction([
         STORES.ATHLETES,
         STORES.TRAININGS,
         STORES.SHOTS,
         STORES.COMMENTS,
+        STORES.GENERAL_COMMENTS,
+        STORES.SERIES_COMMENTS,
         STORES.SETTINGS,
        ], 'readonly');
    tx.oncomplete = () => resolve();
@@ -68,6 +76,14 @@ export async function exportBackup(): Promise<BackupFile> {
       cReq.onsuccess = () => { comments = cReq.result as CommentRecord[]; };
       cReq.onerror = () => reject(cReq.error);
 
+      const gcReq = tx.objectStore(STORES.GENERAL_COMMENTS).getAll();
+      gcReq.onsuccess = () => { generalComments = gcReq.result as GeneralCommentRecord[]; };
+      gcReq.onerror = () => reject(gcReq.error);
+
+      const scReq = tx.objectStore(STORES.SERIES_COMMENTS).getAll();
+      scReq.onsuccess = () => { seriesComments = scReq.result as SeriesCommentRecord[]; };
+      scReq.onerror = () => reject(scReq.error);
+
       const stReq = tx.objectStore(STORES.SETTINGS).getAll();
       stReq.onsuccess = () => {
           const recs = stReq.result as SettingsRecord[];
@@ -88,6 +104,10 @@ export async function exportBackup(): Promise<BackupFile> {
   // Retain comments whose shotId references an exported (committed) shot
   const committedIds = new Set(committed.map((s) => s.id));
   const exportedComments = comments.filter((c) => committedIds.has(c.shotId));
+  // General comments reference trainings (not shots), so all of them export as-is.
+  const trainingIdSet = new Set(trainings.map((t) => t.id));
+  const exportedGeneralComments = generalComments.filter((gc) => trainingIdSet.has(gc.trainingId));
+  const exportedSeriesComments = seriesComments.filter((sc) => trainingIdSet.has(sc.trainingId));
 
   const data: BackupFile = {
     version: 1,
@@ -96,6 +116,8 @@ export async function exportBackup(): Promise<BackupFile> {
     trainings,
     shots: committed,
     comments: exportedComments,
+    generalComments: exportedGeneralComments,
+    seriesComments: exportedSeriesComments,
     settings,
       };
 
@@ -143,6 +165,14 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
   if (file.comments !== undefined && !Array.isArray(file.comments))
     throw new Error('comments must be an array');
   const comments: CommentRecord[] = file.comments ?? [];
+  // generalComments is optional for backward compat; default to []
+  if (file.generalComments !== undefined && !Array.isArray(file.generalComments))
+    throw new Error('generalComments must be an array');
+  const generalComments: GeneralCommentRecord[] = file.generalComments ?? [];
+  // seriesComments is optional for backward compat; default to []
+  if (file.seriesComments !== undefined && !Array.isArray(file.seriesComments))
+    throw new Error('seriesComments must be an array');
+  const seriesComments: SeriesCommentRecord[] = file.seriesComments ?? [];
   if (typeof file.settings !== 'object' || file.settings === null)
     throw new Error('settings must be an object');
 
@@ -218,6 +248,48 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
       throw new Error(`Invalid comment time: ${c.id}`);
   }
 
+  // validate general comments (keyed by trainingId, one per training)
+  const trainingByIdForGC = new Map((file.trainings as TrainingRecord[]).map((t) => [t.id, t]));
+  const seenGeneralCommentTrainingIds = new Set<string>();
+  for (const gc of generalComments) {
+    const parentTraining = typeof gc.trainingId === 'string' ? trainingByIdForGC.get(gc.trainingId) : undefined;
+    if (!parentTraining)
+      throw new Error(`General comment references unknown training: ${gc.trainingId}`);
+    if (seenGeneralCommentTrainingIds.has(gc.trainingId))
+      throw new Error(`Duplicate general comment for training: ${gc.trainingId}`);
+    seenGeneralCommentTrainingIds.add(gc.trainingId);
+    if (typeof gc.athleteId !== 'string')
+      throw new Error(`Invalid generalComment.athleteId: ${gc.trainingId}`);
+    if (gc.athleteId !== parentTraining.athleteId)
+      throw new Error(`General comment athleteId mismatch: ${gc.trainingId}`);
+    if (typeof gc.text !== 'string')
+      throw new Error(`Invalid generalComment text: ${gc.trainingId}`);
+    if (!isISO(gc.createdAt) || !isISO(gc.updatedAt))
+      throw new Error(`Invalid generalComment time: ${gc.trainingId}`);
+  }
+
+  // validate series comments (keyed by trainingId+seriesNumber, one per pair)
+  const seenSeriesCommentKeys = new Set<string>();
+  for (const sc of seriesComments) {
+    const parentTraining = typeof sc.trainingId === 'string' ? trainingByIdForGC.get(sc.trainingId) : undefined;
+    if (!parentTraining)
+      throw new Error(`Series comment references unknown training: ${sc.trainingId}`);
+    if (typeof sc.seriesNumber !== 'number' || !Number.isInteger(sc.seriesNumber) || sc.seriesNumber < 1 || sc.seriesNumber > 6)
+      throw new Error(`Invalid series comment seriesNumber: ${sc.id}`);
+    const key = `${sc.trainingId}:${sc.seriesNumber}`;
+    if (seenSeriesCommentKeys.has(key))
+      throw new Error(`Duplicate series comment for training/series: ${key}`);
+    seenSeriesCommentKeys.add(key);
+    if (typeof sc.athleteId !== 'string')
+      throw new Error(`Invalid seriesComment.athleteId: ${sc.id}`);
+    if (sc.athleteId !== parentTraining.athleteId)
+      throw new Error(`Series comment athleteId mismatch: ${sc.id}`);
+    if (typeof sc.text !== 'string')
+      throw new Error(`Invalid seriesComment text: ${sc.id}`);
+    if (!isISO(sc.createdAt) || !isISO(sc.updatedAt))
+      throw new Error(`Invalid seriesComment time: ${sc.id}`);
+  }
+
   // 5. No duplicate ids across all 3 stores
   const allIds = new Set<string>();
   for (const a of file.athletes as AthleteRecord[]) {
@@ -235,6 +307,10 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
   for (const c of comments) {
     if (allIds.has(c.id)) throw new Error(`Duplicate id: comment ${c.id}`);
     allIds.add(c.id);
+  }
+  for (const sc of seriesComments) {
+    if (allIds.has(sc.id)) throw new Error(`Duplicate id: seriesComment ${sc.id}`);
+    allIds.add(sc.id);
   }
 
   // 4. Referential integrity
@@ -305,7 +381,7 @@ export async function importBackup(data: unknown): Promise<void> {
     // 4. One readwrite tx: clear all, fill, set settings
     await new Promise<void>((resolve, reject) => {
        const tx = db.transaction(
-         [STORES.ATHLETES, STORES.TRAININGS, STORES.SHOTS, STORES.COMMENTS, STORES.SETTINGS],
+         [STORES.ATHLETES, STORES.TRAININGS, STORES.SHOTS, STORES.COMMENTS, STORES.GENERAL_COMMENTS, STORES.SERIES_COMMENTS, STORES.SETTINGS],
           'readwrite',
        );
       tx.oncomplete = () => resolve();
@@ -320,6 +396,8 @@ export async function importBackup(data: unknown): Promise<void> {
       clearAll(STORES.TRAININGS);
       clearAll(STORES.SHOTS);
       clearAll(STORES.COMMENTS);
+      clearAll(STORES.GENERAL_COMMENTS);
+      clearAll(STORES.SERIES_COMMENTS);
       clearAll(STORES.SETTINGS);
 
       // Populate
@@ -331,6 +409,10 @@ export async function importBackup(data: unknown): Promise<void> {
          }
       const fileComments: CommentRecord[] = (file as any).comments ?? [];
       for (const c of fileComments) tx.objectStore(STORES.COMMENTS).put(c);
+      const fileGeneralComments: GeneralCommentRecord[] = (file as any).generalComments ?? [];
+      for (const gc of fileGeneralComments) tx.objectStore(STORES.GENERAL_COMMENTS).put(gc);
+      const fileSeriesComments: SeriesCommentRecord[] = (file as any).seriesComments ?? [];
+      for (const sc of fileSeriesComments) tx.objectStore(STORES.SERIES_COMMENTS).put(sc);
       tx.objectStore(STORES.SETTINGS).put({ key: 'SCORING_VERSION' as const, value: SCORING_VERSION });
       tx.objectStore(STORES.SETTINGS).put({ key: 'dataEpoch' as const, value: newEpoch });
       tx.objectStore(STORES.SETTINGS).put({ key: 'storagePersisted' as const, value: file.settings.storagePersisted });

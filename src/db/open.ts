@@ -54,6 +54,19 @@ function upgrade(db: IDBDatabase, oldVersion: number) {
       cm.createIndex('shotId', 'shotId', { unique: false });
     }
   }
+  if (oldVersion < 3) {
+    if (!db.objectStoreNames.contains('generalComments')) {
+      const gc = db.createObjectStore('generalComments', { keyPath: 'trainingId' });
+      gc.createIndex('athleteId', 'athleteId', { unique: false });
+    }
+  }
+  if (oldVersion < 4) {
+    if (!db.objectStoreNames.contains('seriesComments')) {
+      const sc = db.createObjectStore('seriesComments', { keyPath: 'id' });
+      sc.createIndex('trainingId', 'trainingId', { unique: false });
+      sc.createIndex('athleteId', 'athleteId', { unique: false });
+    }
+  }
 }
 
 export class DBVersionTooNewError extends Error {

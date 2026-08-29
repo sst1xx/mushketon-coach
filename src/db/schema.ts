@@ -45,6 +45,35 @@ export interface CommentRecord {
   updatedAt: string;
 }
 
+/**
+ * General (non-shot) remark for a whole self-started training element
+ * (a "series" — targetShotCount=10 — or a ПП-3 "exercise" —
+ * targetShotCount=60). One per training, keyed by trainingId.
+ */
+export interface GeneralCommentRecord {
+  trainingId: string;
+  athleteId: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * General (non-shot) remark for a single ПП-3 series (targetShotCount=60,
+ * seriesNumber 1..6), independent from the exercise-wide GeneralCommentRecord.
+ * One per (trainingId, seriesNumber) pair — the primary key `id` is
+ * `${trainingId}:${seriesNumber}` (see seriesCommentRepo.ts).
+ */
+export interface SeriesCommentRecord {
+  id: string;
+  athleteId: string;
+  trainingId: string;
+  seriesNumber: number;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt' | 'targetZoomMode';
 
 export interface SettingsRecord {
@@ -53,7 +82,7 @@ export interface SettingsRecord {
 }
 
 export const DB_NAME = 'musketoon-coach';
-export const DB_VERSION = 2;
+export const DB_VERSION = 4;
 
 export const STORES = {
   ATHLETES: 'athletes',
@@ -61,4 +90,6 @@ export const STORES = {
   SHOTS: 'shots',
   SETTINGS: 'settings',
   COMMENTS: 'comments',
+  GENERAL_COMMENTS: 'generalComments',
+  SERIES_COMMENTS: 'seriesComments',
 } as const;

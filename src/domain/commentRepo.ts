@@ -55,6 +55,19 @@ export async function listCommentsByShot(shotId: string): Promise<CommentRecord[
   });
 }
 
+// ─── listCommentsByTraining ───────────────────────────────────────────────────
+
+export async function listCommentsByTraining(trainingId: string): Promise<CommentRecord[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('comments', 'readonly');
+    const req = tx.objectStore('comments').index('trainingId').getAll(trainingId);
+    req.onsuccess = () =>
+      resolve((req.result as CommentRecord[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    req.onerror = () => reject(req.error);
+  });
+}
+
 // ─── updateComment ────────────────────────────────────────────────────────────
 
 export async function updateComment(

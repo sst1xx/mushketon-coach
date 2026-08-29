@@ -55,6 +55,17 @@
   white-space: nowrap;
 }
 
+.remarksBtn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-main);
+  padding: 6px 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .scoreDisplay {
   grid-area: score;
   display: flex;

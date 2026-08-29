@@ -26,6 +26,8 @@ import {
    importBackup,
    destroyBC,
  } from './index';
+import { saveGeneralComment, getGeneralComment } from './generalCommentRepo';
+import { saveSeriesComment, getSeriesComment } from './seriesCommentRepo';
 import { DB_NAME } from '../db/schema';
 
 async function setup() {
@@ -469,6 +471,162 @@ describe('backupService', () => {
     expect(b2.trainings[0].targetShotCount).toBe(10);
     expect(b2.shots[0].id).toBe(b1.shots[0].id);
     });
+
+  it('exportBackup includes general comments; importBackup restores them', async () => {
+    const epoch = await setup();
+    const a = await createAthlete('BkGeneral');
+    const t = await createTraining(a.id, epoch);
+    await saveGeneralComment({ athleteId: a.id, trainingId: t.id, text: 'Общее замечание' }, epoch);
+
+    const b1 = await exportBackup();
+    expect(b1.generalComments).toHaveLength(1);
+    expect(b1.generalComments[0].trainingId).toBe(t.id);
+    expect(b1.generalComments[0].text).toBe('Общее замечание');
+
+    await importBackup(b1);
+    const restored = await getGeneralComment(t.id);
+    expect(restored?.text).toBe('Общее замечание');
+  });
+
+  it('exportBackup includes series comments; importBackup restores them', async () => {
+    const epoch = await setup();
+    const a = await createAthlete('BkSeries');
+    const t = await createTraining(a.id, epoch, 60);
+    await saveSeriesComment({ athleteId: a.id, trainingId: t.id, seriesNumber: 3, text: 'Общее замечание серии 3' }, epoch);
+
+    const b1 = await exportBackup();
+    expect(b1.seriesComments).toHaveLength(1);
+    expect(b1.seriesComments[0].trainingId).toBe(t.id);
+    expect(b1.seriesComments[0].seriesNumber).toBe(3);
+    expect(b1.seriesComments[0].text).toBe('Общее замечание серии 3');
+
+    await importBackup(b1);
+    const restored = await getSeriesComment(t.id, 3);
+    expect(restored?.text).toBe('Общее замечание серии 3');
+  });
+
+  it('validateBackup rejects a series comment referencing an unknown training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [],
+      trainings: [],
+      shots: [],
+      seriesComments: [
+        { id: 'missing:1', trainingId: 'missing', athleteId: 'a1', seriesNumber: 1, text: 'x', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/unknown training/i);
+  });
+
+  it('validateBackup rejects a series comment whose athleteId does not match its training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [
+        { id: 'a1', name: 'X', createdAt: now, updatedAt: now },
+        { id: 'a2', name: 'Y', createdAt: now, updatedAt: now },
+      ],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 60 }],
+      shots: [],
+      seriesComments: [
+        { id: 't1:1', trainingId: 't1', athleteId: 'a2', seriesNumber: 1, text: 'x', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/athleteId mismatch/i);
+  });
+
+  it('validateBackup rejects duplicate series comments for the same training/series pair', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [{ id: 'a1', name: 'X', createdAt: now, updatedAt: now }],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 60 }],
+      shots: [],
+      seriesComments: [
+        { id: 't1:1', trainingId: 't1', athleteId: 'a1', seriesNumber: 1, text: 'first', createdAt: now, updatedAt: now },
+        { id: 't1:1-dup', trainingId: 't1', athleteId: 'a1', seriesNumber: 1, text: 'second', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/Duplicate series comment/i);
+  });
+
+  it('validateBackup accepts an independent general comment and series comment for the same training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [{ id: 'a1', name: 'X', createdAt: now, updatedAt: now }],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 60 }],
+      shots: [],
+      generalComments: [
+        { trainingId: 't1', athleteId: 'a1', text: 'exercise-wide', createdAt: now, updatedAt: now },
+      ],
+      seriesComments: [
+        { id: 't1:1', trainingId: 't1', athleteId: 'a1', seriesNumber: 1, text: 'series-1', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).not.toThrow();
+  });
+
+  it('validateBackup rejects a general comment referencing an unknown training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [],
+      trainings: [],
+      shots: [],
+      generalComments: [
+        { trainingId: 'missing', athleteId: 'a1', text: 'x', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/unknown training/i);
+  });
+
+  it('validateBackup rejects a general comment whose athleteId does not match its training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [
+        { id: 'a1', name: 'X', createdAt: now, updatedAt: now },
+        { id: 'a2', name: 'Y', createdAt: now, updatedAt: now },
+      ],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 10 }],
+      shots: [],
+      generalComments: [
+        { trainingId: 't1', athleteId: 'a2', text: 'x', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/athleteId mismatch/i);
+  });
+
+  it('validateBackup rejects duplicate general comments for the same training', () => {
+    const now = new Date().toISOString();
+    const fake = {
+      version: 1,
+      exportedAt: now,
+      athletes: [{ id: 'a1', name: 'X', createdAt: now, updatedAt: now }],
+      trainings: [{ id: 't1', athleteId: 'a1', startedAt: now, updatedAt: now, completedAt: null, nextShotNumber: 1, targetShotCount: 10 }],
+      shots: [],
+      generalComments: [
+        { trainingId: 't1', athleteId: 'a1', text: 'first', createdAt: now, updatedAt: now },
+        { trainingId: 't1', athleteId: 'a1', text: 'second', createdAt: now, updatedAt: now },
+      ],
+      settings: { SCORING_VERSION: 1, dataEpoch: 1, storagePersisted: null, lastBackupAt: null },
+    };
+    expect(() => validateBackup(fake)).toThrow(/Duplicate general comment/i);
+  });
 
   it('validateBackup rejects duplicate shotNumber', () => {
      const now = new Date().toISOString();

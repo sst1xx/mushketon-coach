@@ -27,6 +27,7 @@ import {
   getPp3CanvasShots,
   resolvePp3ViewedSeriesNumber,
   isViewingPastPp3Series,
+  getScopedRemarksLabel,
 } from '../domain/trainingMode';
 import {
   createComment,
@@ -50,12 +51,23 @@ interface Props {
   epoch: number;
   onBack: () => void;
   onNewTraining?: (newTraining: TrainingRecord) => void;
+  onOpenGeneralRemark?: (training: TrainingRecord) => void;
+  /** Opens the scoped «Замечания» screen for the current/selected series (see PLAN-SCOPED-REMARKS.md). */
+  onOpenTrainingRemarks?: (training: TrainingRecord, seriesNumber: number | null) => void;
+  /**
+   * Set by App when returning from the general remark screen after the
+   * coach used «Просмотр» to edit the last shot: re-shows the completion
+   * overlay (with «Замечания») instead of dropping straight into review mode.
+   */
+  showCompletionOnMount?: boolean;
+  /** Set by App when returning from the scoped remarks screen: restores the ПП-3 series that was being viewed. */
+  restoreSeriesView?: number | null;
 }
 
 // Zoom modes in cyclical order — extend here to add intermediate zoom levels
 const ZOOM_MODES: Array<'full' | 'zoom7' | 'zoom9'> = ['full', 'zoom7', 'zoom9'];
 
-export default function TrainingScreen({ athlete, training, epoch, onBack, onNewTraining }: Props) {
+export default function TrainingScreen({ athlete, training, epoch, onBack, onNewTraining, onOpenGeneralRemark, onOpenTrainingRemarks, showCompletionOnMount, restoreSeriesView }: Props) {
   const [currentTraining, setCurrentTraining] = useState<TrainingRecord>(training);
   const [shots, setShots] = useState<ShotRecord[]>([]);
   const [dragging, setDragging] = useState<{ shotId: string; xh: number; yh: number; isNew: boolean } | null>(null);
@@ -67,12 +79,14 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   // comment modal state
   const [commentModal, setCommentModal] = useState<{ shotId: string; shotNumber: number; existingCommentId: string | null } | null>(null);
   const [commentText, setCommentText] = useState('');
-  // Completed limit warning modal
+  // Completed limit warning modal (also reachable again via the «Итоги» header
+  // button after the coach dismissed it into review mode — see completedModalDismissed).
   const [showCompletedModal, setShowCompletedModal] = useState(false);
+  const [completedModalDismissed, setCompletedModalDismissed] = useState(false);
   // "Начать новую" choice modal: "+ Новая серия" / "+ Новое упражнение"
   const [showNewChoiceModal, setShowNewChoiceModal] = useState(false);
   // ПП-3 series chip picked to view/edit; null falls back to the current series
-  const [selectedSeriesView, setSelectedSeriesView] = useState<number | null>(null);
+  const [selectedSeriesView, setSelectedSeriesView] = useState<number | null>(restoreSeriesView ?? null);
   // Commit confirmation toast ("№N • 10.4") shown briefly after each committed shot
   const [toast, setToast] = useState<string | null>(null);
 
@@ -92,12 +106,17 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       const loaded = await listShots(training.id);
       setShots(loaded);
       setSelectedShotId(null);
-      setSelectedSeriesView(null);
+      setSelectedSeriesView(restoreSeriesView ?? null);
       const db = await openDB();
       const zm = await getSetting(db, 'targetZoomMode');
       if (zm === 'zoom7' || zm === 'zoom9' || zm === 'full') setZoomMode(zm);
       setLoading(false);
+      if (showCompletionOnMount && training.completedAt) {
+        setShowCompletedModal(true);
+        setCompletedModalDismissed(false);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [training]);
 
   const lastShot = shots.length > 0 ? shots[shots.length - 1] : null;
@@ -129,6 +148,14 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     if (mode !== 'pp3' || viewedSeries === null) return shots;
     return getPp3CanvasShots(shots, viewedSeries, isCompleted, selectedSeriesView);
   })();
+  // Which series to scope the header's «Замечания» button/screen to: matches what
+  // the target canvas is currently showing (see getPp3CanvasShots) — the
+  // whole exercise once it's completed and no series chip is picked, or the
+  // specific series being viewed otherwise.
+  const remarksSeriesNumber = mode === 'pp3'
+    ? (isCompleted && selectedSeriesView === null ? null : viewedSeries)
+    : null;
+
   const headerProgressLabel = (() => {
     if (mode === 'series') return `Серия · ${committedCount}/${limit}`;
     if (mode === 'pp3') return `Серия ${pp3CurrentSeries}/6 · ${committedCount}/${limit}`;
@@ -302,7 +329,25 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       <div className={s.header}>
         <button className={s.back} onClick={onBack}>◀ Назад</button>
         <span className={s.athleteName}>{athlete.name}</span>
+        {isCompleted && completedModalDismissed && (
+          <button
+            type="button"
+            className={s.back}
+            onClick={() => setShowCompletedModal(true)}
+          >
+            Итоги
+          </button>
+        )}
         <span className={s.shotNum}>{headerProgressLabel}</span>
+        {onOpenTrainingRemarks && (
+          <button
+            type="button"
+            className={s.remarksBtn}
+            onClick={() => onOpenTrainingRemarks(currentTraining, remarksSeriesNumber)}
+          >
+            {getScopedRemarksLabel(currentTraining, remarksSeriesNumber)}
+          </button>
+        )}
       </div>
 
       {/* Completed / ПП-3 progress banner (status only; the action lives in the fixed-width toolbar below) */}
@@ -391,9 +436,9 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
             className={s.slotBtn}
             onClick={handleOpenComment}
             disabled={!targetShot}
-            aria-label="Замечания"
+            aria-label="Замечание к выстрелу"
           >
-            Замечания
+            Замечание
           </button>
         ) : (
           <button
@@ -425,7 +470,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
             className={`${s.slotBtn} ${targetShot && dragging === null ? '' : s.disabled}`}
             onClick={handleOpenComment}
             disabled={!targetShot || dragging !== null}
-            aria-label="Добавить замечание"
+            aria-label="Добавить замечание к выстрелу"
           >
             Замечание
           </button>
@@ -435,9 +480,17 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
       {/* Completed limit modal warning */}
       <Modal
         isOpen={showCompletedModal}
-        onClose={() => setShowCompletedModal(false)}
+        onClose={() => { setShowCompletedModal(false); setCompletedModalDismissed(true); }}
         actions={[
-          { label: 'Просмотр', onClick: () => setShowCompletedModal(false) },
+          { label: 'Просмотр', onClick: () => { setShowCompletedModal(false); setCompletedModalDismissed(true); } },
+          {
+            label: 'Общее замечание',
+            onClick: () => {
+              setShowCompletedModal(false);
+              setCompletedModalDismissed(true);
+              onOpenGeneralRemark?.(currentTraining);
+            },
+          },
           { label: 'Начать новую', onClick: () => { setShowCompletedModal(false); setShowNewChoiceModal(true); } },
         ]}
       >

@@ -12,11 +12,15 @@ All data stays on the device (IndexedDB). No backend, no accounts, no sync.
    the dev/staging environment used to check functionality; GitHub Pages via the `main` branch is
    production — these are separate targets, never conflate them or treat a Cloudflare deploy as a
    substitute for shipping to production. Cloudflare Pages is the exception: after tests/build pass
-   for a change, `worker` deploys the current UI to the Cloudflare Pages project `mushketon-coach`
+   for a change, `worker` deploys the current UI to the Cloudflare Pages project `musketoon-coach`
    automatically, without asking for separate confirmation, so the user can check the UI. Do not
    touch GitHub Actions or the GitHub Pages workflow to make this happen. If Cloudflare
    authorization or required env vars/secrets are missing, report the deploy error instead of
-   silently skipping it or attempting a workaround.
+   silently skipping it or attempting a workaround. Every successful Cloudflare Pages deploy MUST
+   be reported with the exact deployment URL (per-deploy hash URL) AND the permanent branch alias
+   URL (`https://<branch>.musketoon-coach.pages.dev`), so the user always has a link to check. If
+   the deploy did not run or failed, state that explicitly with the exact error — never omit the
+   link silently or imply a deploy happened when it did not.
 3. NEVER install/upgrade packages without explicit user approval.
 4. NEVER add: backend API, user accounts, cloud DB (D1/KV), analytics, CDN/fonts from other
    origins, `unsafe-inline`/`unsafe-eval` in CSP, new runtime dependencies.
@@ -51,7 +55,7 @@ npm run preview
 `npm test` also works. After code changes always run `npx vitest run`; run `npm run build` too if
 types could break. There is no local deploy script: pushing `main` triggers
 `.github/workflows/deploy-github-pages.yml` (production, explicit user request only). Deploying to
-Cloudflare Pages (dev/staging, via `wrangler pages deploy dist --project-name mushketon-coach`)
+Cloudflare Pages (dev/staging, via `wrangler pages deploy dist --project-name musketoon-coach`)
 happens automatically after a successful test/build for a change, without a separate user request,
 so the user can check the UI; it stays separate from the production GitHub Pages pipeline and does
 not involve editing GitHub Actions. If Cloudflare auth or config is missing, report the failure.

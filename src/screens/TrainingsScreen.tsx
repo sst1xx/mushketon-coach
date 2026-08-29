@@ -70,7 +70,7 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
          <button className={s.back} onClick={onBack}>◀ Назад</button>
          <span className={s.athleteName}>{athlete.name}</span>
          {onOpenRemarks && (
-           <button className={s.remarksBtn} onClick={onOpenRemarks}>Замечания</button>
+           <button className={s.remarksBtn} onClick={onOpenRemarks}>Дневник</button>
          )}
          {onOpenAllShots && (
            <button className={s.remarksBtn} onClick={onOpenAllShots}>Все выстрелы</button>

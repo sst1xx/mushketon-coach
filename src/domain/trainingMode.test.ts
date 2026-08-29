@@ -8,6 +8,8 @@ import {
   getPp3ViewedShots,
   getPp3CanvasShots,
   getTrainingListLabel,
+  getScopedRemarksLabel,
+  getScopedRemarksShotNumberRange,
   resolvePp3ViewedSeriesNumber,
   isViewingPastPp3Series,
 } from './trainingMode';
@@ -220,5 +222,38 @@ describe('getTrainingListLabel', () => {
   it('returns null for legacy records', () => {
     expect(getTrainingListLabel({ targetShotCount: null }, 4)).toBeNull();
     expect(getTrainingListLabel({ targetShotCount: undefined }, 4)).toBeNull();
+  });
+});
+
+describe('getScopedRemarksLabel', () => {
+  it('labels a standalone series', () => {
+    expect(getScopedRemarksLabel({ targetShotCount: 10 }, null)).toBe('Дневник · Серия');
+  });
+
+  it('labels the whole ПП-3 exercise when no series is selected', () => {
+    expect(getScopedRemarksLabel({ targetShotCount: 60 }, null)).toBe('Дневник · Упражнение');
+  });
+
+  it('labels a specific ПП-3 series when one is selected', () => {
+    expect(getScopedRemarksLabel({ targetShotCount: 60 }, 3)).toBe('Дневник · Серия 3');
+  });
+
+  it('falls back to a generic label for legacy records', () => {
+    expect(getScopedRemarksLabel({ targetShotCount: null }, null)).toBe('Дневник');
+  });
+});
+
+describe('getScopedRemarksShotNumberRange', () => {
+  it('covers the whole training for a standalone series', () => {
+    expect(getScopedRemarksShotNumberRange({ targetShotCount: 10 }, null)).toEqual({ start: 1, end: Infinity });
+  });
+
+  it('covers the whole exercise when no ПП-3 series is selected', () => {
+    expect(getScopedRemarksShotNumberRange({ targetShotCount: 60 }, null)).toEqual({ start: 1, end: Infinity });
+  });
+
+  it('covers only the selected ПП-3 series window, matching series boundaries', () => {
+    expect(getScopedRemarksShotNumberRange({ targetShotCount: 60 }, 1)).toEqual({ start: 1, end: 10 });
+    expect(getScopedRemarksShotNumberRange({ targetShotCount: 60 }, 2)).toEqual({ start: 11, end: 20 });
   });
 });

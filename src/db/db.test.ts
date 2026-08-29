@@ -5,6 +5,7 @@ import { initSettings, getSetting, setSetting } from './settings';
 import { runStartupCleanup } from './startup';
 import { withReadWrite, readEpoch, DataEpochMismatchError } from './tx';
 import { SCORING_VERSION } from '../scoring';
+import { DB_VERSION } from './schema';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,10 +166,12 @@ describe('IndexedDB persistence layer', () => {
     await mkShot(dbV1, 's-old', 't-old', 100, 200, 105, 'committed');
     dbV1.close();
 
-    // Now open via openDB() which targets DB_VERSION (2)
+    // Now open via openDB() which targets the current DB_VERSION
     const dbV2 = await openDB();
-    expect(dbV2.version).toBe(2);
+    expect(dbV2.version).toBe(DB_VERSION);
     expect(dbV2.objectStoreNames.contains('comments')).toBe(true);
+    expect(dbV2.objectStoreNames.contains('generalComments')).toBe(true);
+    expect(dbV2.objectStoreNames.contains('seriesComments')).toBe(true);
 
     // Existing data preserved
     expect(await countStore(dbV2, 'athletes')).toBe(1);
@@ -177,6 +180,50 @@ describe('IndexedDB persistence layer', () => {
     const shot = await getShot(dbV2, 's-old');
     expect(shot).toBeDefined();
     expect(shot.score).toBe(105);
+  });
+
+  // ── 1c: migration to v4 is additive — opens an existing v3 DB (with
+  // generalComments but no seriesComments) without errors, creating the new
+  // store empty (see PLAN-DIARY-IA.md §10) ──
+  it('migrates an existing v3 DB (no seriesComments store) to v4 without errors, creating seriesComments empty', async () => {
+    closeDB();
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('musketoon-coach');
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+
+    const dbV3 = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('musketoon-coach', 3);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        d.createObjectStore('athletes', { keyPath: 'id' });
+        const tr = d.createObjectStore('trainings', { keyPath: 'id' });
+        tr.createIndex('athleteId', 'athleteId', { unique: false });
+        const sh = d.createObjectStore('shots', { keyPath: 'id' });
+        sh.createIndex('trainingId', 'trainingId', { unique: false });
+        d.createObjectStore('settings', { keyPath: 'key' });
+        const cm = d.createObjectStore('comments', { keyPath: 'id' });
+        cm.createIndex('athleteId', 'athleteId', { unique: false });
+        cm.createIndex('trainingId', 'trainingId', { unique: false });
+        cm.createIndex('shotId', 'shotId', { unique: false });
+        const gc = d.createObjectStore('generalComments', { keyPath: 'trainingId' });
+        gc.createIndex('athleteId', 'athleteId', { unique: false });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    await mkAthlete(dbV3, 'a-old2', 'Old Athlete 2');
+    await mkTraining(dbV3, 't-old2', 'a-old2');
+    dbV3.close();
+
+    const dbV4 = await openDB();
+    expect(dbV4.version).toBe(DB_VERSION);
+    expect(dbV4.objectStoreNames.contains('seriesComments')).toBe(true);
+    expect(await countStore(dbV4, 'seriesComments')).toBe(0);
+    expect(await countStore(dbV4, 'athletes')).toBe(1);
+    expect(await countStore(dbV4, 'trainings')).toBe(1);
   });
 
     // ── 2: initSettings idempotent ──
