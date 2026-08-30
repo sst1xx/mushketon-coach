@@ -2,7 +2,8 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import RemarksScreen from './RemarksScreen';
-import { renderFunctionComponentToElement } from '../testUtils/fakeHooks';
+import { RemarkRow } from '../components/RemarkRow';
+import { renderFunctionComponentToElement, findElementsByType } from '../testUtils/fakeHooks';
 import type { AthleteRecord, CommentRecord, GeneralCommentRecord, ShotRecord, TrainingRecord } from '../db/schema';
 
 // RemarksScreen loads its diary entries via IndexedDB in a useEffect, which
@@ -123,7 +124,8 @@ describe('RemarksScreen diary view', () => {
       if (node === null || node === undefined || typeof node !== 'object') return false;
       if (Array.isArray(node)) return node.some(findAndClick);
       const el = node as React.ReactElement;
-      const onClick = (el.props as { onClick?: () => void } | undefined)?.onClick;
+      const props = el.props as { onClick?: () => void; onOpenEditor?: () => void; onAdd?: () => void } | undefined;
+      const onClick = props?.onClick ?? props?.onOpenEditor ?? props?.onAdd;
       if (typeof onClick === 'function') {
         onOpenGeneralRemark.mockClear();
         onClick();
@@ -217,7 +219,8 @@ describe('RemarksScreen diary view', () => {
       if (node === null || node === undefined || typeof node !== 'object') return false;
       if (Array.isArray(node)) return node.some(findAndClick);
       const el = node as React.ReactElement;
-      const onClick = (el.props as { onClick?: () => void } | undefined)?.onClick;
+      const props = el.props as { onClick?: () => void; onOpenEditor?: () => void; onAdd?: () => void } | undefined;
+      const onClick = props?.onClick ?? props?.onOpenEditor ?? props?.onAdd;
       if (typeof onClick === 'function') {
         onOpenGeneralRemark.mockClear();
         onClick();
@@ -228,5 +231,33 @@ describe('RemarksScreen diary view', () => {
     }
     expect(findAndClick(element)).toBe(true);
     expect(onOpenGeneralRemark).toHaveBeenCalledWith(emptyTraining);
+  });
+
+  it('navigates to the shot on the target (with the correct shot number) when a shot comment\'s meta-line is clicked', () => {
+    // Integration test for the meta-line action wired in RemarksScreen's
+    // renderShotCommentRow (see PLAN-DIARY-AFFORDANCE.md §3): clicking the
+    // meta-line (not the text) must call onSelectTraining with the shot's
+    // own shotNumber, not just open the training.
+    const onSelectTraining = vi.fn();
+    const props = {
+      athlete,
+      epoch: 1,
+      onBack: () => {},
+      onSelectTraining,
+      onOpenGeneralRemark: () => {},
+    };
+    const element = renderFunctionComponentToElement(
+      RemarksScreen as unknown as (p: typeof props) => React.ReactElement,
+      props,
+      { 0: [{ training: seriesTraining, generalComment: null, shotComments: [shotComment] }], 1: { [shot.id]: shot }, 2: false },
+    );
+    const rows = findElementsByType(element, RemarkRow);
+    const shotNumberMarker = `№${shot.shotNumber}`;
+    const shotRow = rows.find(row => (row.props as { metaLabel?: string }).metaLabel?.includes(shotNumberMarker));
+    expect(shotRow).toBeDefined();
+    const onOpenMeta = (shotRow!.props as { onOpenMeta?: () => void }).onOpenMeta;
+    expect(typeof onOpenMeta).toBe('function');
+    onOpenMeta!();
+    expect(onSelectTraining).toHaveBeenCalledWith(seriesTraining, shot.shotNumber);
   });
 });

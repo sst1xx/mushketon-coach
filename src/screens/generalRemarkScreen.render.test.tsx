@@ -53,4 +53,15 @@ describe('GeneralRemarkScreen', () => {
     expect(markup).toContain('10 выстрелов');
     expect(markup).toContain('96.4 · 96');
   });
+
+  it('disables Save while the text is empty, so it can never silently delete the comment (see PLAN-DIARY-AFFORDANCE.md §2)', () => {
+    const markup = renderScreen(training(10), '');
+    const saveMatch = markup.match(/<button[^>]*disabled=""[^>]*>Сохранить<\/button>/);
+    expect(saveMatch).not.toBeNull();
+  });
+
+  it('does not disable Save once there is non-empty text', () => {
+    const markup = renderScreen(training(10), 'Текст замечания');
+    expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Сохранить<\/button>/);
+  });
 });

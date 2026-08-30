@@ -97,7 +97,7 @@ export default function GeneralRemarkScreen({ athlete, training, seriesNumber = 
       />
       <div className={s.actions}>
         <button className={s.cancelBtn} onClick={onBack}>Отмена</button>
-        <button className={s.saveBtn} onClick={handleSave}>Сохранить</button>
+        <button className={s.saveBtn} onClick={handleSave} disabled={!text.trim()}>Сохранить</button>
       </div>
     </div>
   );

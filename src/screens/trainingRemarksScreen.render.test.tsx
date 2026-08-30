@@ -178,7 +178,10 @@ describe('TrainingRemarksScreen', () => {
     expect(markup).toContain('Текст серии 1');
     expect(markup).toContain('Замечание к выстрелу 1');
     expect(markup).toContain('Серия 2');
-    expect(markup).toContain('Нет общего замечания');
+    // Unified empty state (see PLAN-DIARY-AFFORDANCE.md §2): an absent
+    // series comment is always an actionable "+ Добавить..." button, never
+    // passive placeholder text.
+    expect(markup).toContain('+ Добавить общее замечание серии 2');
   });
 
   it('does not list the 6 series when scoped to one specific series or a standalone series', () => {

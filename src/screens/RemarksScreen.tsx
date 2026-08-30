@@ -4,16 +4,16 @@ import { readEpoch } from '../db/tx';
 import { AthleteRecord, CommentRecord, GeneralCommentRecord, SeriesCommentRecord, ShotRecord, TrainingRecord } from '../db/schema';
 import {
   listCommentsByAthlete,
-  updateComment,
   deleteComment,
 } from '../domain/commentRepo';
 import { listGeneralCommentsByAthlete, deleteGeneralComment } from '../domain/generalCommentRepo';
-import { listSeriesCommentsByAthlete } from '../domain/seriesCommentRepo';
+import { listSeriesCommentsByAthlete, deleteSeriesComment } from '../domain/seriesCommentRepo';
 import { getShot, listShots } from '../domain/shotRepo';
 import { listTrainings } from '../domain/trainingRepo';
 import { getTrainingMode, getPp3SeriesShotGroups } from '../domain/trainingMode';
 import { formatTrainingTotal } from './trainingTotal';
 import Modal from '../components/Modal';
+import { RemarkRow, RemarkRowEmpty } from '../components/RemarkRow';
 import s from './RemarksScreen.module.css';
 
 interface Props {
@@ -22,9 +22,12 @@ interface Props {
   onBack: () => void;
   /** Opens this training's own scoped diary (Дневник · Тренировка), see PLAN-DIARY-IA.md §5/§8. */
   onSelectTraining: (training: TrainingRecord, focusShotNumber?: number) => void;
-  onOpenGeneralRemark: (training: TrainingRecord) => void;
+  /** `seriesNumber` is `null` for the exercise-wide/standalone-series comment, a number for one ПП-3 series' own comment. */
+  onOpenGeneralRemark: (training: TrainingRecord, seriesNumber?: number | null) => void;
   /** Opens the scoped diary of one ПП-3 series directly from its row in an exercise entry. */
   onOpenSeriesDiary?: (training: TrainingRecord, seriesNumber: number) => void;
+  /** Opens the full-screen editor for an existing shot comment (see PLAN-DIARY-AFFORDANCE.md §2). */
+  onEditShotComment: (comment: CommentRecord, shot: ShotRecord | undefined) => void;
 }
 
 interface Pp3SeriesRow {
@@ -65,14 +68,13 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining, onOpenGeneralRemark, onOpenSeriesDiary }: Props) {
+export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining, onOpenGeneralRemark, onOpenSeriesDiary, onEditShotComment }: Props) {
   const [entries, setEntries] = useState<TrainingEntry[]>([]);
   const [shotsById, setShotsById] = useState<Record<string, ShotRecord | undefined>>({});
   const [loading, setLoading] = useState(true);
-  const [editTarget, setEditTarget] = useState<CommentRecord | null>(null);
-  const [editText, setEditText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<CommentRecord | null>(null);
   const [confirmDeleteGeneral, setConfirmDeleteGeneral] = useState<TrainingRecord | null>(null);
+  const [confirmDeleteSeries, setConfirmDeleteSeries] = useState<{ training: TrainingRecord; seriesNumber: number } | null>(null);
 
   const load = useCallback(async () => {
     const [trainings, shotComments, generalComments, seriesComments] = await Promise.all([
@@ -155,30 +157,9 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
 
   useEffect(() => { load(); }, [load]);
 
-  const handleEditOpen = (c: CommentRecord) => {
-    setEditTarget(c);
-    setEditText(c.text);
-  };
-
-  const handleEditSave = async () => {
-    if (!editTarget) return;
-    const trimmed = editText.trim();
-    if (!trimmed) return;
-    const db = await openDB();
-    const ep = await readEpoch(db);
-    await updateComment(editTarget.id, trimmed, ep);
-    setEditTarget(null);
-    await load();
-  };
-
-  const handleShotClick = async (shot: ShotRecord) => {
-    const training = await getShotTraining(shot);
-    if (training) onSelectTraining(training, shot.shotNumber);
-  };
-
-  const getShotTraining = async (shot: ShotRecord): Promise<TrainingRecord | undefined> => {
+  const handleShotClick = (shot: ShotRecord) => {
     const entry = entries.find(e => e.training.id === shot.trainingId);
-    return entry?.training;
+    if (entry) onSelectTraining(entry.training, shot.shotNumber);
   };
 
   const handleDelete = async (c: CommentRecord) => {
@@ -195,6 +176,31 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
     await deleteGeneralComment(training.id, ep);
     setConfirmDeleteGeneral(null);
     await load();
+  };
+
+  const handleDeleteSeries = async () => {
+    if (!confirmDeleteSeries) return;
+    const db = await openDB();
+    const ep = await readEpoch(db);
+    await deleteSeriesComment(confirmDeleteSeries.training.id, confirmDeleteSeries.seriesNumber, ep);
+    setConfirmDeleteSeries(null);
+    await load();
+  };
+
+  const renderShotCommentRow = (c: CommentRecord, nested: boolean) => {
+    const shot = shotsById[c.shotId];
+    return (
+      <RemarkRow
+        key={c.id}
+        text={c.text}
+        metaLabel={`${formatShotLabel(shot)} · ${formatDate(c.createdAt)}`}
+        onOpenMeta={shot ? () => handleShotClick(shot) : undefined}
+        onOpenEditor={() => onEditShotComment(c, shot)}
+        onEdit={() => onEditShotComment(c, shot)}
+        onDelete={() => setConfirmDelete(c)}
+        nested={nested}
+      />
+    );
   };
 
   if (loading) return <div className={s.page}><p>Загрузка…</p></div>;
@@ -226,32 +232,18 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
               </div>
 
               {entry.generalComment ? (
-                <div className={s.generalComment}>
-                  <button
-                    type="button"
-                    className={s.generalCommentBody}
-                    onClick={() => onOpenGeneralRemark(entry.training)}
-                  >
-                    <span className={s.generalCommentLabel}>Общее замечание</span>
-                    <p className={s.commentText}>{entry.generalComment.text}</p>
-                  </button>
-                  <button
-                    type="button"
-                    className={s.delBtn}
-                    onClick={() => setConfirmDeleteGeneral(entry.training)}
-                    aria-label="Удалить общее замечание"
-                  >
-                    ✕
-                  </button>
-                </div>
+                <RemarkRow
+                  label="Общее замечание"
+                  text={entry.generalComment.text}
+                  onOpenEditor={() => onOpenGeneralRemark(entry.training)}
+                  onEdit={() => onOpenGeneralRemark(entry.training)}
+                  onDelete={() => setConfirmDeleteGeneral(entry.training)}
+                />
               ) : entry.training.completedAt !== null ? (
-                <button
-                  type="button"
-                  className={s.addGeneralComment}
-                  onClick={() => onOpenGeneralRemark(entry.training)}
-                >
-                  + Добавить общее замечание
-                </button>
+                <RemarkRowEmpty
+                  addLabel="+ Добавить общее замечание"
+                  onAdd={() => onOpenGeneralRemark(entry.training)}
+                />
               ) : null}
 
               {(entry.pp3Series ?? []).length > 0 ? (
@@ -272,95 +264,38 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
                         </span>
                       </button>
                       {row.seriesComment ? (
-                        <div className={s.pp3SeriesComment}>
-                          <span className={s.generalCommentLabel}>Общее замечание серии</span>
-                          <p className={s.commentText}>{row.seriesComment.text}</p>
-                        </div>
+                        <RemarkRow
+                          label={`Общее замечание серии ${row.index}`}
+                          text={row.seriesComment.text}
+                          onOpenEditor={() => onOpenGeneralRemark(entry.training, row.index)}
+                          onEdit={() => onOpenGeneralRemark(entry.training, row.index)}
+                          onDelete={() => setConfirmDeleteSeries({ training: entry.training, seriesNumber: row.index })}
+                          nested
+                        />
                       ) : (
-                        <span className={s.pp3SeriesNotes}>Нет общего замечания</span>
+                        <RemarkRowEmpty
+                          addLabel={`+ Добавить общее замечание серии ${row.index}`}
+                          onAdd={() => onOpenGeneralRemark(entry.training, row.index)}
+                          nested
+                        />
                       )}
                       {row.shotComments.length > 0 && (
-                        <ul className={s.pp3SeriesShotList}>
-                          {row.shotComments.map(c => (
-                            <li key={c.id} className={s.item}>
-                              <div className={s.itemContent}>
-                                <p className={s.commentText}>{c.text}</p>
-                                {shotsById[c.shotId] ? (
-                                  <button
-                                    type="button"
-                                    className={s.shotLink}
-                                    onClick={() => handleShotClick(shotsById[c.shotId]!)}
-                                  >
-                                    {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
-                                  </button>
-                                ) : (
-                                  <p className={s.commentMeta}>
-                                    {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
-                                  </p>
-                                )}
-                              </div>
-                              <div className={s.itemActions}>
-                                <button className={s.editBtn} onClick={() => handleEditOpen(c)} aria-label="Редактировать">✎</button>
-                                <button className={s.delBtn} onClick={() => setConfirmDelete(c)} aria-label="Удалить">✕</button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className={s.pp3SeriesShotList}>
+                          {row.shotComments.map(c => renderShotCommentRow(c, true))}
+                        </div>
                       )}
                     </li>
                   ))}
                 </ul>
               ) : entry.shotComments.length > 0 && (
-                <ul className={s.list}>
-                  {entry.shotComments.map(c => (
-                    <li key={c.id} className={s.item}>
-                      <div className={s.itemContent}>
-                        <p className={s.commentText}>{c.text}</p>
-                        {shotsById[c.shotId] ? (
-                          <button
-                            type="button"
-                            className={s.shotLink}
-                            onClick={() => handleShotClick(shotsById[c.shotId]!)}
-                          >
-                            {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
-                          </button>
-                        ) : (
-                          <p className={s.commentMeta}>
-                            {formatShotLabel(shotsById[c.shotId])} · {formatDate(c.createdAt)}
-                          </p>
-                        )}
-                      </div>
-                      <div className={s.itemActions}>
-                        <button className={s.editBtn} onClick={() => handleEditOpen(c)} aria-label="Редактировать">✎</button>
-                        <button className={s.delBtn} onClick={() => setConfirmDelete(c)} aria-label="Удалить">✕</button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div>
+                  {entry.shotComments.map(c => renderShotCommentRow(c, false))}
+                </div>
               )}
             </li>
           ))}
         </ul>
       )}
-
-      <Modal
-        isOpen={editTarget !== null}
-        title="Редактировать замечание"
-        onClose={() => setEditTarget(null)}
-        actions={[
-          { label: 'Отмена', onClick: () => setEditTarget(null) },
-          { label: 'Сохранить', onClick: handleEditSave, disabled: !editText.trim() },
-        ]}
-      >
-        <textarea
-          className={s.textarea}
-          value={editText}
-          onChange={e => setEditText(e.target.value)}
-          rows={4}
-          maxLength={1000}
-          autoFocus
-        />
-      </Modal>
 
       <Modal
         isOpen={confirmDelete !== null}
@@ -383,6 +318,18 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
         ]}
       >
         <p>Удалить общее замечание?</p>
+        <p className={s.warn}>Это действие нельзя отменить.</p>
+      </Modal>
+
+      <Modal
+        isOpen={confirmDeleteSeries !== null}
+        onClose={() => setConfirmDeleteSeries(null)}
+        actions={[
+          { label: 'Отмена', onClick: () => setConfirmDeleteSeries(null) },
+          { label: 'Удалить', danger: true, onClick: handleDeleteSeries },
+        ]}
+      >
+        <p>Удалить общее замечание серии?</p>
         <p className={s.warn}>Это действие нельзя отменить.</p>
       </Modal>
     </div>

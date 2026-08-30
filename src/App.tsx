@@ -11,7 +11,9 @@ import SettingsScreen from './screens/SettingsScreen';
 import RemarksScreen from './screens/RemarksScreen';
 import GeneralRemarkScreen from './screens/GeneralRemarkScreen';
 import TrainingRemarksScreen from './screens/TrainingRemarksScreen';
+import ShotRemarkEditorScreen from './screens/ShotRemarkEditorScreen';
 import AllShotsScreen from './screens/AllShotsScreen';
+import type { CommentRecord, ShotRecord } from './db/schema';
 import { getTrainingMode, getPp3CurrentSeriesNumber } from './domain/trainingMode';
 import styles from './App.module.css';
 
@@ -43,6 +45,12 @@ type Screen =
       seriesNumber: number | null;
     }
   | { name: 'trainingRemarks'; athlete: AthleteRecord; training: TrainingRecord; seriesNumber: number | null }
+  | {
+      name: 'shotRemarkEditor';
+      athlete: AthleteRecord;
+      comment: CommentRecord;
+      shot: ShotRecord | undefined;
+    }
   | { name: 'allShots'; athlete: AthleteRecord }
   | { name: 'settings' };
 
@@ -102,8 +110,19 @@ export default function App() {
             : null;
           push({ name: 'trainingRemarks', athlete: screen.athlete, training, seriesNumber });
         }}
-        onOpenGeneralRemark={(training) => push({ name: 'generalRemark', athlete: screen.athlete, training, seriesNumber: null })}
+        onOpenGeneralRemark={(training, seriesNumber = null) => push({ name: 'generalRemark', athlete: screen.athlete, training, seriesNumber })}
         onOpenSeriesDiary={(training, seriesNumber) => push({ name: 'trainingRemarks', athlete: screen.athlete, training, seriesNumber })}
+        onEditShotComment={(comment, shot) => push({ name: 'shotRemarkEditor', athlete: screen.athlete, comment, shot })}
+      />
+    );
+  }
+  if (screen.name === 'shotRemarkEditor') {
+    return (
+      <ShotRemarkEditorScreen
+        athlete={screen.athlete}
+        comment={screen.comment}
+        shot={screen.shot}
+        onBack={pop}
       />
     );
   }
@@ -134,6 +153,7 @@ export default function App() {
         onOpenSeriesDiary={(training, seriesNumber) =>
           push({ name: 'trainingRemarks', athlete: screen.athlete, training, seriesNumber })
         }
+        onEditShotComment={(comment, shot) => push({ name: 'shotRemarkEditor', athlete: screen.athlete, comment, shot })}
       />
     );
   }

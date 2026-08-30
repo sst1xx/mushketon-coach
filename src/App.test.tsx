@@ -5,8 +5,9 @@ import TrainingScreen from './screens/TrainingScreen';
 import GeneralRemarkScreen from './screens/GeneralRemarkScreen';
 import TrainingRemarksScreen from './screens/TrainingRemarksScreen';
 import RemarksScreen from './screens/RemarksScreen';
+import ShotRemarkEditorScreen from './screens/ShotRemarkEditorScreen';
 import { findElementsByType } from './testUtils/fakeHooks';
-import type { AthleteRecord, TrainingRecord } from './db/schema';
+import type { AthleteRecord, CommentRecord, ShotRecord, TrainingRecord } from './db/schema';
 
 // App's screen routing now runs off a navigation stack (see
 // PLAN-DIARY-IA.md §4): `stack` (useState index 2) holds `Screen[]`, and
@@ -232,6 +233,49 @@ describe('App routing: scoped diary from TrainingScreen (see PLAN-DIARY-IA.md §
   it('renders RemarksScreen for the remarks route (sanity check for the import above)', () => {
     const { element } = renderAppScreen([{ name: 'athletes' }, { name: 'remarks', athlete }]);
     expect(findElementsByType(element, RemarksScreen)).toHaveLength(1);
+  });
+});
+
+describe('App routing: shot remark full-screen editor (see PLAN-DIARY-AFFORDANCE.md §2)', () => {
+  const comment: CommentRecord = {
+    id: 'c1', athleteId: athlete.id, trainingId: training.id, shotId: 's1', text: 'Увёл вправо',
+    createdAt: '', updatedAt: '',
+  };
+  const shot: ShotRecord = {
+    id: 's1', trainingId: training.id, shotNumber: 4, x: 0, y: 0, score: 95,
+    status: 'committed', createdAt: '', updatedAt: '',
+  };
+
+  it('opening a shot comment from the full diary pushes the full-screen shot remark editor', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onEditShotComment = (remarksScreens[0].props as {
+      onEditShotComment: (c: CommentRecord, sh: ShotRecord | undefined) => void;
+    }).onEditShotComment;
+    onEditShotComment(comment, shot);
+    expect(stackCalls).toEqual([[...stack, { name: 'shotRemarkEditor', athlete, comment, shot }]]);
+  });
+
+  it('opening a shot comment from a scoped training diary pushes the full-screen shot remark editor', () => {
+    const stack = [{ name: 'athletes' }, { name: 'trainingRemarks', athlete, training, seriesNumber: null }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, TrainingRemarksScreen);
+    const onEditShotComment = (remarksScreens[0].props as {
+      onEditShotComment: (c: CommentRecord, sh: ShotRecord | undefined) => void;
+    }).onEditShotComment;
+    onEditShotComment(comment, shot);
+    expect(stackCalls).toEqual([[...stack, { name: 'shotRemarkEditor', athlete, comment, shot }]]);
+  });
+
+  it('popping from the shot remark editor returns to the screen it was opened from', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete }, { name: 'shotRemarkEditor', athlete, comment, shot }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const editorScreens = findElementsByType(element, ShotRemarkEditorScreen);
+    expect(editorScreens).toHaveLength(1);
+    const onBack = (editorScreens[0].props as { onBack: () => void }).onBack;
+    onBack();
+    expect(stackCalls).toEqual([[{ name: 'athletes' }, { name: 'remarks', athlete }]]);
   });
 });
 
