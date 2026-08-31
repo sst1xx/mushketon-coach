@@ -156,17 +156,38 @@ Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6);
 
 ## 7. Delegating to helper agents
 
-Roles, cheapest first: `scout` < `worker` < `reviewer` < `oracle`. Model and cost bindings per role
-live in the agent tool's own config, never in this file.
+Roles, cheapest first: `scout` < `delegate` < `researcher` < `worker` < `reviewer` < `oracle`.
+Model and cost bindings per role live in the agent tool's own config, never in this file.
 
 | Task | Agent |
 | --- | --- |
-| Find files, "where is X", read-only recon | `scout` |
+| Fast local recon: relevant files, entry points, data flow, risks | `scout` (read-only) |
+| External facts: web/docs research, brief with sources; never repo facts (that is `scout`) | `researcher` (read-only) |
 | Write code, edit files, run tests/build, deploy | `worker` (only agent that edits) |
-| Check worker's result vs task/plan, run tests; review and report only, never edits | `reviewer` (read-only) |
-| Risky design decision, or worker failed twice | `oracle` (advisory, never edits) |
+| Check worker's result vs task/plan, tests, edge cases, simplicity; report only | `reviewer` (read-only) |
+| Second opinion on a risky decision, or worker failed twice | `oracle` (advisory, never edits) |
+| Small self-contained chore needing no special role (summarize a doc, draft a plan skeleton) | `delegate` (read-only) |
 
-Default pipeline: `scout` → plan → `worker` → `reviewer`.
+`delegate` is never used for code edits, deploys, or as a replacement for `reviewer`.
+
+The builtin `reviewer` can make small fixes by default; this project overrides that — `reviewer`
+never edits here, every fix goes back to `worker`.
+
+Default pipeline: `scout` (+ `researcher` when external facts matter) → plan → `worker` →
+`reviewer`, with `oracle` inserted before acting when the decision itself is risky.
+
+Rule of thumb: `scout` before you understand the code, `researcher` before you trust external
+facts, `worker` to implement, `reviewer` to check, `oracle` when the decision feels risky,
+`delegate` for trivia.
+
+Read-only agents (`scout`/`researcher`/`reviewer`/`oracle`/`delegate`) may run in `main/` for
+read-only inspection; write work is `worker`-only and happens only in a `wt-*/` worktree (see §8).
+
+A documentation-lookup capability for current library/framework docs (React, Vite, vite-plugin-pwa,
+Vitest, Wrangler) is granted to `researcher`, `worker`, `reviewer` and `oracle`, and not to `scout`
+or `delegate`, so they do not rely on stale model knowledge. Use it for API/config facts about
+third-party tools; repo facts still come from `scout`. The grant itself lives in the agent tool's
+own config, not in this file (see rule 9 in §1).
 
 Rules:
 - The coordinator **never** edits code and **never** deploys — it always delegates to `worker` and
@@ -186,7 +207,8 @@ Rules:
   automatically after a successful test/build, without waiting for a separate user request or for
   `reviewer`. Cloudflare and GitHub Pages `main` are separate targets — deploying to one is never a
   substitute for or implicitly authorized by a request to deploy to the other.
-- Never use `oracle` for recon or routine review; never use `worker` for read-only questions.
+- Never use `oracle` for recon or routine review; never use `worker` for read-only questions;
+  never use `researcher` for repo recon; never use `delegate` for code changes or review.
 
 ## 8. Worktrees
 
