@@ -74,7 +74,7 @@ export interface SeriesCommentRecord {
   updatedAt: string;
 }
 
-export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt' | 'targetZoomMode';
+export type SettingsKey = 'SCORING_VERSION' | 'dataEpoch' | 'storagePersisted' | 'lastBackupAt' | 'targetZoomMode' | 'themeMode';
 
 export interface SettingsRecord {
   key: SettingsKey;

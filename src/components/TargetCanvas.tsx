@@ -242,12 +242,12 @@ export default function TargetCanvas({
   // Ring geometry, shared unmodified between the main canvas and the loupe HUD.
   const ringElements = (
     <>
-      {/* 1. White background — always full viewBox radius */}
-      <circle cx={CENTER} cy={CENTER} r={80} fill="white" stroke="#333" strokeWidth={0.4} />
+      {/* 1. Paper background — always full viewBox radius */}
+      <circle cx={CENTER} cy={CENTER} r={80} fill="var(--target-paper)" stroke="var(--target-outer-ring-stroke)" strokeWidth={0.4} />
 
-      {/* 2. Black zone: solid black circle up to ring-7 boundary (scaled for zoom) */}
+      {/* 2. Black zone: solid dark circle up to ring-7 boundary (scaled for zoom) */}
       <circle cx={CENTER} cy={CENTER}
-        r={(isZoom9 ? RING_D[9] : RING_D[7]) / 2 * ZOOM_SCALE} fill="black" />
+        r={(isZoom9 ? RING_D[9] : RING_D[7]) / 2 * ZOOM_SCALE} fill="var(--target-black-zone)" />
 
       {/* 3. Ring boundary lines (radii scaled by ZOOM_SCALE) */}
       {isZoom7 || isZoom9 ? (
@@ -255,26 +255,26 @@ export default function TargetCanvas({
           {/* Zoomed views: outer boundary is the selected ring, with inner rings shown. */}
           {(isZoom7 ? [8, 9] : [10]).map(n => (
             <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2 * ZOOM_SCALE}
-              fill="none" stroke="white" strokeWidth={0.3} />
+              fill="none" stroke="var(--target-inner-ring-stroke)" strokeWidth={0.3} />
           ))}
           <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2 * ZOOM_SCALE}
-            fill="none" stroke="white" strokeWidth={0.3} />
-          <circle cx={CENTER} cy={CENTER} r={2.5 * ZOOM_SCALE} fill="white" />
+            fill="none" stroke="var(--target-inner-ring-stroke)" strokeWidth={0.3} />
+          <circle cx={CENTER} cy={CENTER} r={2.5 * ZOOM_SCALE} fill="var(--target-center-dot)" />
         </>
       ) : (
         <>
-          {/* Full: outer rings 1-6 (black stroke on white), inner 8-9 (white stroke on black) */}
+          {/* Full: outer rings 1-6 on the paper zone, inner 8-9 on the black zone */}
           {([1, 2, 3, 4, 5, 6] as const).map(n => (
             <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
-              fill="none" stroke="#333" strokeWidth={0.3} />
+              fill="none" stroke="var(--target-outer-ring-stroke)" strokeWidth={0.3} />
           ))}
           {([8, 9] as const).map(n => (
             <circle key={n} cx={CENTER} cy={CENTER} r={RING_D[n] / 2}
-              fill="none" stroke="white" strokeWidth={0.3} />
+              fill="none" stroke="var(--target-inner-ring-stroke)" strokeWidth={0.3} />
           ))}
           <circle cx={CENTER} cy={CENTER} r={RING_D[10] / 2}
-            fill="none" stroke="white" strokeWidth={0.3} />
-          <circle cx={CENTER} cy={CENTER} r={2.5} fill="white" />
+            fill="none" stroke="var(--target-inner-ring-stroke)" strokeWidth={0.3} />
+          <circle cx={CENTER} cy={CENTER} r={2.5} fill="var(--target-center-dot)" />
         </>
       )}
 
@@ -286,7 +286,7 @@ export default function TargetCanvas({
             x={CENTER + dx * r}
             y={CENTER + dy * r}
             fontSize={labelFont}
-            fill={color}
+            fill={color === 'white' ? 'var(--target-label-inner)' : 'var(--target-label-outer)'}
             textAnchor="middle"
             dominantBaseline="central"
             className={styles.label}
@@ -311,17 +311,17 @@ export default function TargetCanvas({
 
     const { rInner, rOuter, fontSize } = getShotMarkerDims(zoomMode, emphasis);
     const fillColor = readOnly
-      ? (commentedShotIds?.has(shot.id) ? '#3B82F6' : 'black')
-      : (isSelected ? '#3B82F6' : (isDragging || isLast) ? '#22C55E' : 'black');
-    const strokeColor = 'white';
-    const textFill = 'white';
+      ? (commentedShotIds?.has(shot.id) ? 'var(--target-shot-selected-fill)' : 'var(--target-shot-regular-fill)')
+      : (isSelected ? 'var(--target-shot-selected-fill)' : (isDragging || isLast) ? 'var(--target-shot-emphasis-fill)' : 'var(--target-shot-regular-fill)');
+    const strokeColor = 'var(--target-shot-stroke)';
+    const textFill = 'var(--target-shot-text)';
     const tooltipText = readOnly ? shotTooltip?.(shot.id) : null;
     const label = shotLabels ? shotLabels.get(shot.id) : shot.shotNumber;
 
     return (
       <g key={shot.id} onPointerDown={readOnly ? handleMarkerPointerDown(shot.id) : undefined}>
         {tooltipText && <title>{tooltipText}</title>}
-        <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="white" strokeWidth={0.6} />
+        <circle cx={sp.px} cy={sp.py} r={rOuter} fill="none" stroke="var(--target-shot-stroke)" strokeWidth={0.6} />
         <circle cx={sp.px} cy={sp.py} r={rInner} fill={fillColor} stroke={strokeColor} strokeWidth={0.25} />
         <text
           x={sp.px} y={sp.py}

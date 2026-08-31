@@ -64,6 +64,7 @@
   font-size: 17px;
   padding: 10px 0;
   cursor: pointer;
+  color: var(--color-text-main);
   min-height: var(--touch-target-min);
 }
 
@@ -97,6 +98,8 @@
   border: 1px solid var(--color-border);
   border-radius: 6px;
   min-width: 0;
+  background: var(--color-bg-card);
+  color: var(--color-text-main);
 }
 
 .addBtn {

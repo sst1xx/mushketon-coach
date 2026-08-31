@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { openDB } from '../db/open';
 import { getSetting, setSetting } from '../db/settings';
 import { exportBackup, importBackup, validateBackup } from '../domain/backupService';
+import { applyTheme, isThemeMode, type ThemeMode } from '../utils/theme';
 import Modal from '../components/Modal';
 import s from './SettingsScreen.module.css';
 
@@ -19,6 +20,7 @@ export default function SettingsScreen({ onBack }: Props) {
   const [storageInfo, setStorageInfo] = useState<{ usage: number; quota: number } | null>(null);
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<unknown>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,8 +32,16 @@ export default function SettingsScreen({ onBack }: Props) {
       const db = await openDB();
       const persisted = await getSetting(db, 'storagePersisted');
       setStoragePersisted(persisted as boolean | null);
+      const tm = await getSetting(db, 'themeMode');
+      if (isThemeMode(tm)) setThemeMode(tm);
     })();
   }, []);
+
+  const handleThemeChange = async (mode: ThemeMode) => {
+    setThemeMode(mode);
+    applyTheme(mode);
+    await setSetting(await openDB(), 'themeMode', mode);
+  };
 
   const handleExport = async () => {
     try {
@@ -88,6 +98,28 @@ export default function SettingsScreen({ onBack }: Props) {
         <button className={s.back} onClick={onBack}>◀ Назад</button>
         <span className={s.title}>Настройки</span>
       </div>
+
+      {/* Section: Тема */}
+      <section className={s.section}>
+        <h3 className={s.sectionTitle}>Тема</h3>
+        <div className={s.divider} />
+        <div className={s.themeRow}>
+          <button
+            className={s.themeBtn}
+            aria-pressed={themeMode === 'light'}
+            onClick={() => handleThemeChange('light')}
+          >
+            Светлая
+          </button>
+          <button
+            className={s.themeBtn}
+            aria-pressed={themeMode === 'dark'}
+            onClick={() => handleThemeChange('dark')}
+          >
+            Тёмная
+          </button>
+        </div>
+      </section>
 
       {/* Section: Данные */}
       <section className={s.section}>

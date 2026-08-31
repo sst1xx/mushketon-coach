@@ -194,12 +194,12 @@ describe('TargetCanvas shot marker selection and colors', () => {
     // Filter inner marker circles with stroke-width="0.25"
     const innerCircles = circles.filter(c => c.attrs['stroke-width'] === '0.25');
     expect(innerCircles).toHaveLength(3);
-    // s1 is selected older shot -> #3B82F6 (blue)
-    expect(innerCircles[0].attrs.fill).toBe('#3B82F6');
-    // s2 is regular older shot -> black
-    expect(innerCircles[1].attrs.fill).toBe('black');
-    // s3 is last shot -> #22C55E (green)
-    expect(innerCircles[2].attrs.fill).toBe('#22C55E');
+    // s1 is selected older shot -> theme-aware selected color
+    expect(innerCircles[0].attrs.fill).toBe('var(--target-shot-selected-fill)');
+    // s2 is regular older shot -> theme-aware regular color
+    expect(innerCircles[1].attrs.fill).toBe('var(--target-shot-regular-fill)');
+    // s3 is last shot -> theme-aware emphasis color
+    expect(innerCircles[2].attrs.fill).toBe('var(--target-shot-emphasis-fill)');
   });
 });
 

@@ -30,4 +30,6 @@ export async function initSettings(db: IDBDatabase): Promise<void> {
   if (ep === null) await setSetting(db, 'dataEpoch', 1);
    const zm = await getSetting(db, 'targetZoomMode');
   if (zm === null) await setSetting(db, 'targetZoomMode', 'full');
+   const tm = await getSetting(db, 'themeMode');
+  if (tm === null) await setSetting(db, 'themeMode', 'light');
 }

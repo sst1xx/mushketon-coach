@@ -58,8 +58,8 @@ describe('TargetCanvas readOnly rendering', () => {
     );
     const circles = extractCircles(markup);
     const innerCircles = circles.filter(c => c.attrs['stroke-width'] === '0.25');
-    expect(innerCircles[0].attrs.fill).toBe('#3B82F6');
-    expect(innerCircles[1].attrs.fill).toBe('black');
+    expect(innerCircles[0].attrs.fill).toBe('var(--target-shot-selected-fill)');
+    expect(innerCircles[1].attrs.fill).toBe('var(--target-shot-regular-fill)');
   });
 
   it('renders a <title> tooltip only for a shot with tooltip text', () => {

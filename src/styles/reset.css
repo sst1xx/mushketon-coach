@@ -19,9 +19,16 @@ html, body {
   height: 100%;
 }
 
-button {
+/* Buttons/inputs/textareas/selects have their own UA-stylesheet text color
+   (e.g. Chrome's `button { color: buttontext }`) that does NOT follow the
+   theme's --color-text-main unless overridden — on the dark theme that left
+   text invisible on any button/field that didn't set an explicit `color`
+   (e.g. the newly created athlete's name button). Inheriting fixes those by
+   default; per-component rules that need a different color still win. */
+button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  color: inherit;
 }
 
 /* Global visible focus ring for keyboard navigation, so every interactive

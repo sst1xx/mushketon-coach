@@ -15,6 +15,8 @@ import ShotRemarkEditorScreen from './screens/ShotRemarkEditorScreen';
 import AllShotsScreen from './screens/AllShotsScreen';
 import type { CommentRecord, ShotRecord } from './db/schema';
 import { getTrainingMode, getPp3CurrentSeriesNumber } from './domain/trainingMode';
+import { applyTheme, isThemeMode } from './utils/theme';
+import { getSetting } from './db/settings';
 import styles from './App.module.css';
 
 /**
@@ -72,6 +74,8 @@ export default function App() {
         const db = await openDB();
         await runStartupCleanup(db);
         await initSettings(db);
+        const themeMode = await getSetting(db, 'themeMode');
+        applyTheme(isThemeMode(themeMode) ? themeMode : 'light');
         const ep = await readEpoch(db);
         setEpoch(ep);
         setReady(true);

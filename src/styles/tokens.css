@@ -28,10 +28,28 @@
   --color-border-focus: #4361ee;
   --color-danger: #d90429;
   --color-danger-active: #a6001a;
+  --color-danger-solid: var(--color-danger); /* used where danger bg carries white button text */
   --color-primary: #1a1a2e;
   --color-primary-active: #000010;
+  --color-primary-solid: var(--color-primary); /* used where primary bg carries white button text */
   --color-success: #15803d; /* WCAG AA: >=4.5:1 for white text on this bg and for this text color on --color-bg-app */
   --color-selected: #3b82f6;
+
+  /* Target visuals (TargetCanvas/TargetLoupe): ISSF geometry is unaffected —
+     only paint colors. Light-theme values match the pre-theming literals. */
+  --target-paper: white;
+  --target-black-zone: black;
+  --target-outer-ring-stroke: #333;
+  --target-inner-ring-stroke: white;
+  --target-center-dot: white;
+  --target-label-outer: black;
+  --target-label-inner: white;
+  --target-shot-regular-fill: black;
+  --target-shot-emphasis-fill: #22C55E;
+  --target-shot-selected-fill: #3B82F6;
+  --target-shot-stroke: white;
+  --target-shot-text: white;
+  --target-loupe-bg: #fff;
 
   /* Elevation / z-index */
   --z-base: 1;
@@ -50,4 +68,49 @@
   :root {
     --transition-duration: 0s;
   }
+}
+
+/* Dark theme: graphite + green, in the spirit of SIUS electronic-target
+   indicators. Applied by src/utils/theme.ts via [data-theme="dark"] on
+   <html>. Contrast checked for text-on-bg pairs used across the app. */
+[data-theme='dark'] {
+  --color-bg-app: #10140f;
+  --color-bg-card: #1a2018;
+  --color-bg-toolbar: #0d1a10;
+  --color-text-main: #eaf5ea;
+  --color-text-muted: #a9c2a9;
+  --color-text-subtle: #7f9c80;
+  --color-border: #2c3a2c;
+  --color-border-focus: #4ade80;
+  /* --color-danger/--color-primary stay bright: they are also used as plain
+     text/border color on dark backgrounds (>=4.5:1 there). Solid buttons with
+     white text use the darker -solid tokens below instead (>=4.5:1 for white
+     text on that bg). */
+  --color-danger: #f2596a;
+  --color-danger-active: #b91c1c; /* --active is only used as solid-button :active bg; keep it >=4.5:1 for white text */
+  --color-danger-solid: #dc2626; /* WCAG AA: >=4.5:1 for white text on this bg */
+  --color-primary: #22c55e;
+  --color-primary-active: #14532d; /* --active is only used as solid-button :active bg; keep it >=4.5:1 for white text */
+  --color-primary-solid: #15803d; /* WCAG AA: >=4.5:1 for white text on this bg */
+  --color-success: #4ade80; /* WCAG AA: >=4.5:1 for this text color on --color-bg-app */
+  --color-selected: #22c55e;
+
+  /* Target visuals: SIUS-style dark graphite-green target instead of a
+     blinding white paper; phosphor-green rings/labels on the near-black
+     zone. Paper/black-zone are intentionally much darker than the app's
+     own --color-bg-app so the target reads as unmistakably dark, not as a
+     lighter card floating on a dark page. */
+  --target-paper: #0b120d;
+  --target-black-zone: #000000;
+  --target-outer-ring-stroke: #3f5c46;
+  --target-inner-ring-stroke: #7fdb9a;
+  --target-center-dot: #7fdb9a;
+  --target-label-outer: #cfe9d4;
+  --target-label-inner: #7fdb9a;
+  --target-shot-regular-fill: #1f6b3d;
+  --target-shot-emphasis-fill: #22c55e;
+  --target-shot-selected-fill: #3b82f6;
+  --target-shot-stroke: #d7f5df;
+  --target-shot-text: #f2fff5;
+  --target-loupe-bg: #0b120d;
 }

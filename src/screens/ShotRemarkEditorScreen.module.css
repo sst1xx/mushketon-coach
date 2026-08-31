@@ -63,6 +63,8 @@
   box-sizing: border-box;
   resize: vertical;
   font-family: var(--font-system);
+  background: var(--color-bg-card);
+  color: var(--color-text-main);
 }
 
 .actions {
@@ -88,7 +90,7 @@
 }
 
 .saveBtn {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   border: none;
   color: #fff;
 }

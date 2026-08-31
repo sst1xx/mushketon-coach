@@ -231,6 +231,7 @@ describe('IndexedDB persistence layer', () => {
     await initSettings(db);
     expect(await getSetting(db, 'SCORING_VERSION')).toBe(SCORING_VERSION);
     expect(await getSetting(db, 'dataEpoch')).toBe(1);
+    expect(await getSetting(db, 'themeMode')).toBe('light');
       });
 
     // ── 3: draft deleted, committed kept ──
