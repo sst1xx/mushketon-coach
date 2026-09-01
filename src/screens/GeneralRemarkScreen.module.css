@@ -11,6 +11,11 @@
   padding-bottom: calc(24px + var(--safe-bottom));
   padding-left: calc(16px + var(--safe-left));
   padding-right: calc(16px + var(--safe-right));
+  /* iOS scrolls the focused textarea into view using this container's own
+     scroll offset; without scroll-padding-top it aligns the caret flush
+     with the container's top edge, under the notch/status bar, until a
+     second line pushes it further down. */
+  scroll-padding-top: calc(12px + var(--safe-top));
   font-family: var(--font-system);
   display: flex;
   flex-direction: column;
