@@ -38,6 +38,24 @@
   white-space: nowrap;
 }
 
+.filterRow {
+  display: flex;
+  padding: 0 16px 8px;
+  flex-shrink: 0;
+}
+
+.trainingSelect {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--color-text-main);
+  background: var(--color-bg-app);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-height: var(--touch-target-min);
+}
+
 .targetWrap {
   position: relative;
   flex: 1;

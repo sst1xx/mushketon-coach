@@ -5,6 +5,7 @@ import type { ShotRecord, CommentRecord } from '../db/schema';
 
 export interface AllShotsEntry {
   shot: ShotRecord;
+  trainingId: string;
   globalNumber: number; // 1..N, chronological across trainings
   hasComment: boolean;
   commentText: string | null; // first comment text, for tooltip
@@ -18,11 +19,11 @@ export async function listAllShotsForAthlete(athleteId: string): Promise<AllShot
     return a.id.localeCompare(b.id);
   });
 
-  const committedShots: ShotRecord[] = [];
+  const committedShots: Array<{ shot: ShotRecord; trainingId: string }> = [];
   for (const training of chronological) {
     const shots = await listShots(training.id);
     for (const shot of shots) {
-      if (shot.status === 'committed') committedShots.push(shot);
+      if (shot.status === 'committed') committedShots.push({ shot, trainingId: training.id });
     }
   }
 
@@ -34,10 +35,11 @@ export async function listAllShotsForAthlete(athleteId: string): Promise<AllShot
     }
   }
 
-  return committedShots.map((shot, index) => {
+  return committedShots.map(({ shot, trainingId }, index) => {
     const comment = firstCommentByShotId.get(shot.id);
     return {
       shot,
+      trainingId,
       globalNumber: index + 1,
       hasComment: comment !== undefined,
       commentText: comment ? comment.text : null,

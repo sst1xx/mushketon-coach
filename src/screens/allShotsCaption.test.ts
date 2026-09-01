@@ -17,6 +17,7 @@ function makeEntry(overrides: Partial<AllShotsEntry> = {}): AllShotsEntry {
   };
   return {
     shot,
+    trainingId: 't1',
     globalNumber: 1,
     hasComment: false,
     commentText: null,
