@@ -37,8 +37,6 @@
 - [docs/plans/PLAN.md](docs/plans/PLAN.md) — полная спецификация проекта.
 - [docs/reference/CHANGES-TARGET-VISUAL.md](docs/reference/CHANGES-TARGET-VISUAL.md) —
   геометрия и цвета мишени ISSF.
-- [docs/reference/CLOUDFLARE-FREE-CONSTRAINTS.md](docs/reference/CLOUDFLARE-FREE-CONSTRAINTS.md) —
-  ограничения бесплатного тарифа Cloudflare Pages (dev/staging окружение).
 
 ## Запуск для разработки
 
