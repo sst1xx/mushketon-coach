@@ -132,6 +132,56 @@
   margin: 6px 0 0 0;
 }
 
+.foldAllRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.foldAllButton {
+  min-height: var(--touch-target-min);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text-main);
+  cursor: pointer;
+}
+.foldAllButton:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.foldToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.foldToggle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.pp3SeriesHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pp3SeriesHeaderRow .pp3SeriesRow {
+  flex: 1;
+}
+
 .warn {
   color: var(--color-text-muted);
   font-size: 14px;

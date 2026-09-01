@@ -40,13 +40,19 @@ const shotComment: CommentRecord = {
 function renderDiary(entries: unknown[], shotsById: Record<string, ShotRecord | undefined>, callbacks: Partial<{
   onSelectTraining: (t: TrainingRecord) => void;
   onOpenGeneralRemark: (t: TrainingRecord) => void;
-}> = {}) {
+}> = {}, foldedTrainings?: Record<string, boolean>) {
   const props = {
     athlete,
     epoch: 1,
     onBack: () => {},
     onSelectTraining: callbacks.onSelectTraining ?? (() => {}),
     onOpenGeneralRemark: callbacks.onOpenGeneralRemark ?? (() => {}),
+    onEditShotComment: () => {},
+    onToggleTrainingFold: () => {},
+    onToggleSeriesFold: () => {},
+    onCollapseAll: () => {},
+    onExpandAll: () => {},
+    foldedTrainings,
   };
   const element = renderFunctionComponentToElement(
     RemarksScreen as unknown as (p: typeof props) => React.ReactElement,
@@ -109,6 +115,11 @@ describe('RemarksScreen diary view', () => {
       onBack: () => {},
       onSelectTraining: () => {},
       onOpenGeneralRemark,
+      onEditShotComment: () => {},
+      onToggleTrainingFold: () => {},
+      onToggleSeriesFold: () => {},
+      onCollapseAll: () => {},
+      onExpandAll: () => {},
     };
     const element = renderFunctionComponentToElement(
       RemarksScreen as unknown as (p: typeof props) => React.ReactElement,
@@ -140,9 +151,13 @@ describe('RemarksScreen diary view', () => {
 
   it('shows a completed training with no comments at all with an "add general remark" action', () => {
     const emptyTraining: TrainingRecord = { ...seriesTraining, id: 't-empty' };
+    // Empty completed trainings are folded by default (PLAN-DIARY-FOLD.md §4);
+    // explicitly expand this one to check its body content is rendered when open.
     const markup = renderDiary(
       [{ training: emptyTraining, generalComment: null, shotComments: [] }],
       {},
+      {},
+      { [emptyTraining.id]: false },
     );
     expect(markup).toContain('Серия');
     expect(markup).toContain('Добавить общее замечание');
@@ -209,6 +224,12 @@ describe('RemarksScreen diary view', () => {
       onBack: () => {},
       onSelectTraining: () => {},
       onOpenGeneralRemark,
+      onEditShotComment: () => {},
+      onToggleTrainingFold: () => {},
+      onToggleSeriesFold: () => {},
+      onCollapseAll: () => {},
+      onExpandAll: () => {},
+      foldedTrainings: { [emptyTraining.id]: false },
     };
     const element = renderFunctionComponentToElement(
       RemarksScreen as unknown as (p: typeof props) => React.ReactElement,
@@ -245,6 +266,11 @@ describe('RemarksScreen diary view', () => {
       onBack: () => {},
       onSelectTraining,
       onOpenGeneralRemark: () => {},
+      onEditShotComment: () => {},
+      onToggleTrainingFold: () => {},
+      onToggleSeriesFold: () => {},
+      onCollapseAll: () => {},
+      onExpandAll: () => {},
     };
     const element = renderFunctionComponentToElement(
       RemarksScreen as unknown as (p: typeof props) => React.ReactElement,

@@ -315,3 +315,78 @@ describe('App routing: diary (RemarksScreen) navigation (see PLAN-DIARY-IA.md §
     expect(stackCalls).toEqual([[...stack, { name: 'trainingRemarks', athlete, training, seriesNumber: 5 }]]);
   });
 });
+
+describe('App routing: diary fold toggle callbacks resolve the currently displayed state, not the missing-key default (PLAN-DIARY-FOLD.md §5/§5.1)', () => {
+  it('onToggleTrainingFold toggles off (false→true) when the caller reports currentFolded=false, regardless of the map key being absent', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete, foldedTrainings: {} }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onToggleTrainingFold = (remarksScreens[0].props as {
+      onToggleTrainingFold: (trainingId: string, currentFolded: boolean) => void;
+    }).onToggleTrainingFold;
+    // Caller (RemarksScreen) reports the currently *displayed* fold state,
+    // which may already be true via defaultTrainingFolded even though the
+    // map has no explicit key for this trainingId.
+    onToggleTrainingFold(training.id, true);
+    expect(stackCalls).toEqual([[
+      { name: 'athletes' },
+      { name: 'remarks', athlete, foldedTrainings: { [training.id]: false } },
+    ]]);
+  });
+
+  it('onToggleTrainingFold flips an explicit existing key normally', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete, foldedTrainings: { [training.id]: true } }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onToggleTrainingFold = (remarksScreens[0].props as {
+      onToggleTrainingFold: (trainingId: string, currentFolded: boolean) => void;
+    }).onToggleTrainingFold;
+    onToggleTrainingFold(training.id, true);
+    expect(stackCalls).toEqual([[
+      { name: 'athletes' },
+      { name: 'remarks', athlete, foldedTrainings: { [training.id]: false } },
+    ]]);
+  });
+
+  it('onToggleSeriesFold toggles off (false→true) when the caller reports currentFolded=false for an absent key', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete, foldedSeries: {} }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onToggleSeriesFold = (remarksScreens[0].props as {
+      onToggleSeriesFold: (trainingId: string, seriesIndex: number, currentFolded: boolean) => void;
+    }).onToggleSeriesFold;
+    onToggleSeriesFold(training.id, 3, false);
+    expect(stackCalls).toEqual([[
+      { name: 'athletes' },
+      { name: 'remarks', athlete, foldedSeries: { [`${training.id}:3`]: true } },
+    ]]);
+  });
+
+  it('onToggleSeriesFold flips an explicit existing key normally', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete, foldedSeries: { [`${training.id}:3`]: false } }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onToggleSeriesFold = (remarksScreens[0].props as {
+      onToggleSeriesFold: (trainingId: string, seriesIndex: number, currentFolded: boolean) => void;
+    }).onToggleSeriesFold;
+    onToggleSeriesFold(training.id, 3, false);
+    expect(stackCalls).toEqual([[
+      { name: 'athletes' },
+      { name: 'remarks', athlete, foldedSeries: { [`${training.id}:3`]: true } },
+    ]]);
+  });
+
+  it('onCollapseAll/onExpandAll replace foldedTrainings/foldedSeries with the given state as-is (bulk callbacks unaffected)', () => {
+    const stack = [{ name: 'athletes' }, { name: 'remarks', athlete }];
+    const { element, stackCalls } = renderAppScreen(stack);
+    const remarksScreens = findElementsByType(element, RemarksScreen);
+    const onCollapseAll = (remarksScreens[0].props as {
+      onCollapseAll: (state: { foldedTrainings: Record<string, boolean>; foldedSeries: Record<string, boolean> }) => void;
+    }).onCollapseAll;
+    onCollapseAll({ foldedTrainings: { [training.id]: true }, foldedSeries: { [`${training.id}:1`]: true } });
+    expect(stackCalls).toEqual([[
+      { name: 'athletes' },
+      { name: 'remarks', athlete, foldedTrainings: { [training.id]: true }, foldedSeries: { [`${training.id}:1`]: true } },
+    ]]);
+  });
+});

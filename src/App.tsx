@@ -38,7 +38,14 @@ type Screen =
       showCompletionOnMount?: boolean;
       restoreSeriesView?: number | null;
     }
-  | { name: 'remarks'; athlete: AthleteRecord }
+  | {
+      name: 'remarks';
+      athlete: AthleteRecord;
+      /** Fold state per top-level diary entry (trainingId). Missing key = default, see PLAN-DIARY-FOLD.md §4. */
+      foldedTrainings?: Record<string, boolean>;
+      /** Fold state per ПП-3 series, keyed by `${trainingId}:${seriesIndex}`. Missing key = default. */
+      foldedSeries?: Record<string, boolean>;
+    }
   | {
       name: 'generalRemark';
       athlete: AthleteRecord;
@@ -107,6 +114,8 @@ export default function App() {
       <RemarksScreen
         athlete={screen.athlete}
         epoch={epoch}
+        foldedTrainings={screen.foldedTrainings}
+        foldedSeries={screen.foldedSeries}
         onBack={pop}
         onSelectTraining={(training, focusShotNumber) => {
           const seriesNumber = focusShotNumber !== undefined && getTrainingMode(training) === 'pp3'
@@ -117,6 +126,19 @@ export default function App() {
         onOpenGeneralRemark={(training, seriesNumber = null) => push({ name: 'generalRemark', athlete: screen.athlete, training, seriesNumber })}
         onOpenSeriesDiary={(training, seriesNumber) => push({ name: 'trainingRemarks', athlete: screen.athlete, training, seriesNumber })}
         onEditShotComment={(comment, shot) => push({ name: 'shotRemarkEditor', athlete: screen.athlete, comment, shot })}
+        onToggleTrainingFold={(trainingId, currentFolded) => replaceTop({
+          ...screen,
+          foldedTrainings: { ...screen.foldedTrainings, [trainingId]: !currentFolded },
+        })}
+        onToggleSeriesFold={(trainingId, seriesIndex, currentFolded) => {
+          const key = `${trainingId}:${seriesIndex}`;
+          replaceTop({
+            ...screen,
+            foldedSeries: { ...screen.foldedSeries, [key]: !currentFolded },
+          });
+        }}
+        onCollapseAll={(state) => replaceTop({ ...screen, foldedTrainings: state.foldedTrainings, foldedSeries: state.foldedSeries })}
+        onExpandAll={(state) => replaceTop({ ...screen, foldedTrainings: state.foldedTrainings, foldedSeries: state.foldedSeries })}
       />
     );
   }

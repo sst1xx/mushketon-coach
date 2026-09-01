@@ -14,6 +14,15 @@ import { getTrainingMode, getPp3SeriesShotGroups } from '../domain/trainingMode'
 import { formatTrainingTotal } from './trainingTotal';
 import Modal from '../components/Modal';
 import { RemarkRow, RemarkRowEmpty } from '../components/RemarkRow';
+import {
+  defaultTrainingFolded,
+  defaultSeriesFolded,
+  isTrainingFolded,
+  isSeriesFolded,
+  seriesFoldKey,
+  collapseAllFoldState,
+  expandAllFoldState,
+} from './diaryFold';
 import s from './RemarksScreen.module.css';
 
 interface Props {
@@ -28,6 +37,15 @@ interface Props {
   onOpenSeriesDiary?: (training: TrainingRecord, seriesNumber: number) => void;
   /** Opens the full-screen editor for an existing shot comment (see PLAN-DIARY-AFFORDANCE.md §2). */
   onEditShotComment: (comment: CommentRecord, shot: ShotRecord | undefined) => void;
+  /** Fold state per top-level diary entry (trainingId). See PLAN-DIARY-FOLD.md §3.1. */
+  foldedTrainings?: Record<string, boolean>;
+  /** Fold state per ПП-3 series, keyed by `${trainingId}:${seriesIndex}`. */
+  foldedSeries?: Record<string, boolean>;
+  /** `currentFolded` is the fold state actually displayed for this entry (after applying the default), so the caller can toggle it without re-deriving the default. */
+  onToggleTrainingFold: (trainingId: string, currentFolded: boolean) => void;
+  onToggleSeriesFold: (trainingId: string, seriesIndex: number, currentFolded: boolean) => void;
+  onCollapseAll: (state: { foldedTrainings: Record<string, boolean>; foldedSeries: Record<string, boolean> }) => void;
+  onExpandAll: (state: { foldedTrainings: Record<string, boolean>; foldedSeries: Record<string, boolean> }) => void;
 }
 
 interface Pp3SeriesRow {
@@ -68,7 +86,21 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining, onOpenGeneralRemark, onOpenSeriesDiary, onEditShotComment }: Props) {
+export default function RemarksScreen({
+  athlete,
+  epoch,
+  onBack,
+  onSelectTraining,
+  onOpenGeneralRemark,
+  onOpenSeriesDiary,
+  onEditShotComment,
+  foldedTrainings,
+  foldedSeries,
+  onToggleTrainingFold,
+  onToggleSeriesFold,
+  onCollapseAll,
+  onExpandAll,
+}: Props) {
   const [entries, setEntries] = useState<TrainingEntry[]>([]);
   const [shotsById, setShotsById] = useState<Record<string, ShotRecord | undefined>>({});
   const [loading, setLoading] = useState(true);
@@ -216,8 +248,41 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
       {entries.length === 0 ? (
         <p className={s.empty}>Нет замечаний</p>
       ) : (
-        <ul className={s.diary}>
-          {entries.map(entry => (
+        <>
+          <div className={s.foldAllRow}>
+            <button
+              type="button"
+              className={s.foldAllButton}
+              onClick={() => onCollapseAll(collapseAllFoldState(entries.map(entry => ({
+                trainingId: entry.training.id,
+                seriesIndexes: (entry.pp3Series ?? []).map(row => row.index),
+              }))))}
+            >
+              Свернуть все
+            </button>
+            <button
+              type="button"
+              className={s.foldAllButton}
+              onClick={() => onExpandAll(expandAllFoldState(entries.map(entry => ({
+                trainingId: entry.training.id,
+                seriesIndexes: (entry.pp3Series ?? []).map(row => row.index),
+              }))))}
+            >
+              Развернуть все
+            </button>
+          </div>
+          <ul className={s.diary}>
+          {entries.map(entry => {
+            const trainingDefaultFolded = defaultTrainingFolded({
+              completedAt: entry.training.completedAt,
+              hasGeneralComment: entry.generalComment !== null,
+              hasAnySeriesOrShotComment:
+                entry.shotComments.length > 0
+                || (entry.pp3Series ?? []).some(row => row.seriesComment !== null || row.shotComments.length > 0),
+            });
+            const trainingFolded = isTrainingFolded(foldedTrainings, entry.training.id, trainingDefaultFolded);
+            const trainingContentId = `diary-training-${entry.training.id}`;
+            return (
             <li key={entry.training.id} className={s.diaryEntry}>
               <div className={s.diaryEntryHeader}>
                 <span className={s.diaryDate}>{formatDate(entry.training.startedAt)}</span>
@@ -229,8 +294,20 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
                   {trainingLabel(entry.training)}
                 </button>
                 <span className={s.diaryResult}>{entry.resultLabel}</span>
+                <button
+                  type="button"
+                  className={s.foldToggle}
+                  aria-expanded={!trainingFolded}
+                  aria-controls={trainingContentId}
+                  aria-label={trainingFolded ? 'Развернуть запись' : 'Свернуть запись'}
+                  onClick={() => onToggleTrainingFold(entry.training.id, trainingFolded)}
+                >
+                  {trainingFolded ? '▶' : '▼'}
+                </button>
               </div>
 
+              {trainingFolded ? null : (
+              <div id={trainingContentId}>
               {entry.generalComment ? (
                 <RemarkRow
                   label="Общее замечание"
@@ -251,18 +328,39 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
                 // own comment and its shots' comments are nested *inside*
                 // that series' entry — never as a separate flat list.
                 <ul className={s.pp3SeriesList}>
-                  {entry.pp3Series.map(row => (
-                    <li key={row.index}>
-                      <button
-                        type="button"
-                        className={s.pp3SeriesRow}
-                        onClick={() => onOpenSeriesDiary?.(entry.training, row.index)}
-                      >
-                        <span className={s.pp3SeriesTitle}>Серия {row.index}</span>
-                        <span className={s.pp3SeriesMeta}>
-                          {row.committedCount} выстрелов · {row.resultLabel}
-                        </span>
-                      </button>
+                  {(entry.pp3Series ?? []).map(row => {
+                    const seriesDefaultFolded = defaultSeriesFolded({
+                      hasSeriesComment: row.seriesComment !== null,
+                      hasShotComments: row.shotComments.length > 0,
+                    });
+                    const seriesFolded = isSeriesFolded(foldedSeries, entry.training.id, row.index, seriesDefaultFolded);
+                    const seriesContentId = `diary-series-${entry.training.id}-${row.index}`;
+                    return (
+                    <li key={seriesFoldKey(entry.training.id, row.index)}>
+                      <div className={s.pp3SeriesHeaderRow}>
+                        <button
+                          type="button"
+                          className={s.pp3SeriesRow}
+                          onClick={() => onOpenSeriesDiary?.(entry.training, row.index)}
+                        >
+                          <span className={s.pp3SeriesTitle}>Серия {row.index}</span>
+                          <span className={s.pp3SeriesMeta}>
+                            {row.committedCount} выстрелов · {row.resultLabel}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className={s.foldToggle}
+                          aria-expanded={!seriesFolded}
+                          aria-controls={seriesContentId}
+                          aria-label={seriesFolded ? 'Развернуть серию' : 'Свернуть серию'}
+                          onClick={() => onToggleSeriesFold(entry.training.id, row.index, seriesFolded)}
+                        >
+                          {seriesFolded ? '▶' : '▼'}
+                        </button>
+                      </div>
+                      {seriesFolded ? null : (
+                      <div id={seriesContentId}>
                       {row.seriesComment ? (
                         <RemarkRow
                           label={`Общее замечание серии ${row.index}`}
@@ -284,17 +382,24 @@ export default function RemarksScreen({ athlete, epoch, onBack, onSelectTraining
                           {row.shotComments.map(c => renderShotCommentRow(c, true))}
                         </div>
                       )}
+                      </div>
+                      )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               ) : entry.shotComments.length > 0 && (
                 <div>
                   {entry.shotComments.map(c => renderShotCommentRow(c, false))}
                 </div>
               )}
+              </div>
+              )}
             </li>
-          ))}
-        </ul>
+            );
+          })}
+          </ul>
+        </>
       )}
 
       <Modal
