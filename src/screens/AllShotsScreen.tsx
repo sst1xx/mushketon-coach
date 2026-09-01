@@ -3,7 +3,7 @@ import { openDB } from '../db/open';
 import { AthleteRecord, TrainingRecord } from '../db/schema';
 import { listAllShotsForAthlete, AllShotsEntry } from '../domain/allShotsRepo';
 import { listTrainings } from '../domain/trainingRepo';
-import { formatCommentLine } from './allShotsCaption';
+import { formatCommentLine, formatShotLabel } from './allShotsCaption';
 import { filterAllShotsEntries } from './allShotsFilter';
 import TargetCanvas from '../components/TargetCanvas';
 import { getSetting, setSetting } from '../db/settings';
@@ -18,10 +18,7 @@ const ZOOM_LABELS: Record<'full' | 'zoom7' | 'zoom9', string> = {
 // Zoom modes in cyclical order — extend here to add intermediate zoom levels
 const ZOOM_MODES: Array<'full' | 'zoom7' | 'zoom9'> = ['full', 'zoom7', 'zoom9'];
 
-const ALL_TRAININGS_VALUE = 'all';
-const RECENT_TRAININGS_LIMIT = 10;
-
-const trainingDateFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+const trainingDateFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
 const trainingTimeFormatter = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
 interface Props {
@@ -32,7 +29,7 @@ interface Props {
 export default function AllShotsScreen({ athlete, onBack }: Props) {
   const [entries, setEntries] = useState<AllShotsEntry[]>([]);
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
-  const [selectedTrainingId, setSelectedTrainingId] = useState<string>(ALL_TRAININGS_VALUE);
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string>>(new Set());
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [zoomMode, setZoomMode] = useState<'full' | 'zoom7' | 'zoom9'>('full');
@@ -59,20 +56,11 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
     [trainings],
   );
 
-  // Most recent first, used for the select's option order in both branches.
+  // Most recent first, used for the chip row order.
   const trainingsByRecency = useMemo(
     () => [...trainingsChronological].reverse(),
     [trainingsChronological],
   );
-  const showRecentGroup = trainingsChronological.length > RECENT_TRAININGS_LIMIT;
-
-  const shotCountByTrainingId = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const e of entries) {
-      counts.set(e.trainingId, (counts.get(e.trainingId) ?? 0) + 1);
-    }
-    return counts;
-  }, [entries]);
 
   // Show the time alongside the date only when two or more trainings share the same
   // calendar date — otherwise the date alone is unambiguous.
@@ -85,10 +73,15 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
     return [...dateCounts.values()].some((count) => count >= 2);
   }, [trainingsChronological]);
 
-  // When a specific training is selected, filter to its entries and renumber 1..N within it.
+  // Empty selectedTrainingIds means "no filter" — the [Все] chip represents this state.
   const displayedEntries = useMemo(
-    () => filterAllShotsEntries(entries, selectedTrainingId === ALL_TRAININGS_VALUE ? null : selectedTrainingId),
-    [entries, selectedTrainingId],
+    () => filterAllShotsEntries(entries, selectedTrainingIds.size === 0 ? null : selectedTrainingIds),
+    [entries, selectedTrainingIds],
+  );
+
+  const multiTraining = useMemo(
+    () => new Set(displayedEntries.map((e) => e.trainingId)).size >= 2,
+    [displayedEntries],
   );
 
   const shots = displayedEntries.map(e => e.shot);
@@ -98,15 +91,19 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
     displayedEntries.filter(e => e.globalNumber <= 99).map(e => [e.shot.id, e.globalNumber]),
   );
 
+  // Keep the current shot selection only while it is still part of the displayed
+  // set — toggling a chip should not blindly reset the selection every time.
+  useEffect(() => {
+    if (selectedShotId && !displayedEntries.some((e) => e.shot.id === selectedShotId)) {
+      setSelectedShotId(null);
+    }
+  }, [displayedEntries, selectedShotId]);
+
   const lastEntry = displayedEntries.length > 0 ? displayedEntries[displayedEntries.length - 1] : null;
   const selectedEntry = selectedShotId ? displayedEntries.find(e => e.shot.id === selectedShotId) ?? null : null;
   const targetEntry = selectedEntry ?? lastEntry;
 
-  const displayLabel = (() => {
-    if (!targetEntry) return '–';
-    const scoreLabel = targetEntry.shot.score > 0 ? (targetEntry.shot.score / 10).toFixed(1) : '0.0';
-    return `№${targetEntry.globalNumber} • ${scoreLabel}`;
-  })();
+  const displayLabel = formatShotLabel(targetEntry, multiTraining);
   const commentLine = formatCommentLine(targetEntry);
 
   const toggleZoom = async () => {
@@ -117,9 +114,17 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
     await setSetting(db, 'targetZoomMode', next);
   };
 
-  const handleTrainingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTrainingId(e.target.value);
-    setSelectedShotId(null);
+  const toggleAllChip = () => {
+    setSelectedTrainingIds(new Set());
+  };
+
+  const toggleTrainingChip = (trainingId: string) => {
+    setSelectedTrainingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(trainingId)) next.delete(trainingId);
+      else next.add(trainingId);
+      return next;
+    });
   };
 
   if (loading) return <div className={s.page}><p>Загрузка…</p></div>;
@@ -131,35 +136,34 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
         <span className={s.athleteName}>{athlete.name}</span>
       </div>
 
-      <div className={s.filterRow}>
-        <select
-          className={s.trainingSelect}
-          value={selectedTrainingId}
-          onChange={handleTrainingChange}
-          aria-label="Тренировка"
-        >
-          <option value={ALL_TRAININGS_VALUE}>Все тренировки</option>
-          {(() => {
-            const renderOption = (training: TrainingRecord) => {
-              const startedAt = new Date(training.startedAt);
-              const dateLabel = trainingDateFormatter.format(startedAt);
-              const label = needsTimeInLabel ? `${dateLabel}, ${trainingTimeFormatter.format(startedAt)}` : dateLabel;
-              return (
-                <option key={training.id} value={training.id}>
-                  {label} • {shotCountByTrainingId.get(training.id) ?? 0} выстрелов
-                </option>
-              );
-            };
-            if (showRecentGroup) {
-              return (
-                <optgroup label={`последние ${RECENT_TRAININGS_LIMIT}`}>
-                  {trainingsByRecency.slice(0, RECENT_TRAININGS_LIMIT).map(renderOption)}
-                </optgroup>
-              );
-            }
-            return trainingsByRecency.map(renderOption);
-          })()}
-        </select>
+      <div className={s.chipRow} role="group" aria-label="Тренировки">
+        <div className={s.chipTrack}>
+          <button
+            type="button"
+            className={selectedTrainingIds.size === 0 ? s.chipActive : s.chip}
+            aria-pressed={selectedTrainingIds.size === 0}
+            onClick={toggleAllChip}
+          >
+            Все
+          </button>
+          {trainingsByRecency.map((training) => {
+            const startedAt = new Date(training.startedAt);
+            const dateLabel = trainingDateFormatter.format(startedAt);
+            const label = needsTimeInLabel ? `${dateLabel}, ${trainingTimeFormatter.format(startedAt)}` : dateLabel;
+            const isSelected = selectedTrainingIds.has(training.id);
+            return (
+              <button
+                key={training.id}
+                type="button"
+                className={isSelected ? s.chipActive : s.chip}
+                aria-pressed={isSelected}
+                onClick={() => toggleTrainingChip(training.id)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className={s.targetWrap}>

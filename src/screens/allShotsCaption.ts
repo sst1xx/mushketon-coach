@@ -14,3 +14,19 @@ export function formatCommentLine(entry: AllShotsEntry | null): string {
   const trimmed = (entry.commentText ?? '').trim();
   return trimmed ? `💬 ${trimmed}` : '💬 —';
 }
+
+const shotLabelDateFormatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+
+/**
+ * Pure formatter for the score line shown above the target on
+ * AllShotsScreen. When more than one training is represented in the
+ * currently displayed entries, the training date is appended so the coach
+ * can tell which training a given shot belongs to.
+ */
+export function formatShotLabel(entry: AllShotsEntry | null, multiTraining: boolean): string {
+  if (!entry) return '–';
+  const scoreLabel = entry.shot.score > 0 ? (entry.shot.score / 10).toFixed(1) : '0.0';
+  if (!multiTraining) return `№${entry.globalNumber} • ${scoreLabel}`;
+  const dateLabel = shotLabelDateFormatter.format(new Date(entry.shot.createdAt));
+  return `№${entry.globalNumber} (${dateLabel}) • ${scoreLabel}`;
+}

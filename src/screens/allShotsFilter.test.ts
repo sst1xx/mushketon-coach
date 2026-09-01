@@ -14,27 +14,44 @@ function makeEntry(id: string, trainingId: string, globalNumber: number): AllSho
 }
 
 describe('filterAllShotsEntries', () => {
-  it('returns all entries unchanged when trainingId is null', () => {
+  it('returns all entries unchanged when trainingIds is null', () => {
     const entries = [makeEntry('s1', 't1', 1), makeEntry('s2', 't2', 2), makeEntry('s3', 't1', 3)];
     const result = filterAllShotsEntries(entries, null);
     expect(result).toEqual(entries);
   });
 
+  it('returns all entries unchanged when trainingIds is an empty set', () => {
+    const entries = [makeEntry('s1', 't1', 1), makeEntry('s2', 't2', 2), makeEntry('s3', 't1', 3)];
+    const result = filterAllShotsEntries(entries, new Set());
+    expect(result).toEqual(entries);
+  });
+
   it('returns only entries of the selected training', () => {
     const entries = [makeEntry('s1', 't1', 1), makeEntry('s2', 't2', 2), makeEntry('s3', 't1', 3)];
-    const result = filterAllShotsEntries(entries, 't1');
+    const result = filterAllShotsEntries(entries, new Set(['t1']));
     expect(result.map((e) => e.shot.id)).toEqual(['s1', 's3']);
   });
 
-  it('renumbers globalNumber densely starting at 1 within the filtered training', () => {
+  it('returns entries from multiple selected trainings, preserving original order', () => {
+    const entries = [
+      makeEntry('s1', 't1', 1),
+      makeEntry('s2', 't2', 2),
+      makeEntry('s3', 't3', 3),
+      makeEntry('s4', 't1', 4),
+    ];
+    const result = filterAllShotsEntries(entries, new Set(['t1', 't3']));
+    expect(result.map((e) => e.shot.id)).toEqual(['s1', 's3', 's4']);
+  });
+
+  it('renumbers globalNumber densely starting at 1 within the filtered trainings', () => {
     const entries = [makeEntry('s1', 't1', 1), makeEntry('s2', 't2', 2), makeEntry('s3', 't1', 3), makeEntry('s4', 't1', 4)];
-    const result = filterAllShotsEntries(entries, 't1');
+    const result = filterAllShotsEntries(entries, new Set(['t1']));
     expect(result.map((e) => e.globalNumber)).toEqual([1, 2, 3]);
   });
 
-  it('returns an empty array when the training id does not match any entry', () => {
+  it('returns an empty array when no training id in the set matches any entry', () => {
     const entries = [makeEntry('s1', 't1', 1), makeEntry('s2', 't2', 2)];
-    const result = filterAllShotsEntries(entries, 'nonexistent');
+    const result = filterAllShotsEntries(entries, new Set(['nonexistent']));
     expect(result).toEqual([]);
   });
 });

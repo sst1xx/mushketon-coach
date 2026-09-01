@@ -38,22 +38,41 @@
   white-space: nowrap;
 }
 
-.filterRow {
-  display: flex;
-  padding: 0 16px 8px;
+.chipRow {
+  overflow-x: auto;
+  padding-bottom: 8px;
   flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 32px), transparent 100%);
 }
 
-.trainingSelect {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  color: var(--color-text-main);
-  background: var(--color-bg-app);
+.chipTrack {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  padding: 0 16px;
+}
+
+.chip,
+.chipActive {
+  flex-shrink: 0;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  background: none;
+  color: var(--color-text-main);
   min-height: var(--touch-target-min);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.chipActive {
+  border-color: var(--color-border-focus);
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .targetWrap {
