@@ -483,21 +483,27 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         onClose={() => { setShowCompletedModal(false); setCompletedModalDismissed(true); }}
         actions={[
           { label: 'Просмотр', onClick: () => { setShowCompletedModal(false); setCompletedModalDismissed(true); } },
-          {
-            label: 'Общее замечание',
-            onClick: () => {
-              setShowCompletedModal(false);
-              setCompletedModalDismissed(true);
-              onOpenGeneralRemark?.(currentTraining);
-            },
-          },
-          { label: 'Начать новую', onClick: () => { setShowCompletedModal(false); setShowNewChoiceModal(true); } },
         ]}
       >
         <p className={s.dialogHeading}>{mode === 'pp3' ? 'упражнение ПП-3 завершено' : 'серия завершена'}</p>
         <p className={s.dialogInfo}>
           Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
         </p>
+        <div className={s.newChoiceActions}>
+          <button
+            className={s.newChoiceBtn}
+            onClick={() => {
+              setShowCompletedModal(false);
+              setCompletedModalDismissed(true);
+              onOpenGeneralRemark?.(currentTraining);
+            }}
+          >
+            Общее замечание
+          </button>
+          <button className={s.newChoiceBtn} onClick={() => { setShowCompletedModal(false); setShowNewChoiceModal(true); }}>
+            Начать новую
+          </button>
+        </div>
       </Modal>
 
       {/* "Начать новую" choice: two vertical actions per PLAN-TRAINING-MODES.md §1 */}
@@ -537,6 +543,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
           placeholder="Введите замечание…"
         />
       </Modal>
+
     </div>
   );
 }

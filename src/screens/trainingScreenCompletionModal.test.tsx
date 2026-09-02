@@ -11,9 +11,13 @@ import type { AthleteRecord, TrainingRecord } from '../db/schema';
 // has no DOM environment, so that effect can never actually run under
 // renderToStaticMarkup. Instead we call the component directly under a fake
 // hooks dispatcher (see src/testUtils/fakeHooks.ts, same technique as
-// targetCanvasReadOnly.test.tsx) and force `loading` (useState index 4) and
-// `showCompletedModal` (index 9) to the values they hold once the completion
-// modal is actually visible in the app — without ever touching the DB.
+// targetCanvasReadOnly.test.tsx) and force specific useState slices (by call
+// order) to the values they hold once the relevant modal is actually visible
+// in the app — without ever touching the DB.
+//
+// useState indices in TrainingScreen:
+//   4  loading                 ← forced false in tests
+//   9  showCompletedModal      ← forced true in tests
 
 const athlete: AthleteRecord = { id: 'a1', name: 'Coach', createdAt: '', updatedAt: '' };
 
@@ -29,7 +33,11 @@ function completedTraining(targetShotCount: number): TrainingRecord {
   };
 }
 
-function renderCompletionModal(training: TrainingRecord, onOpenGeneralRemark: (t: TrainingRecord) => void) {
+function renderTrainingScreen(
+  training: TrainingRecord,
+  onOpenGeneralRemark: (t: TrainingRecord) => void,
+  stateOverrides: Record<number, unknown> = {},
+) {
   const props = {
     athlete,
     training,
@@ -37,31 +45,49 @@ function renderCompletionModal(training: TrainingRecord, onOpenGeneralRemark: (t
     onBack: () => {},
     onOpenGeneralRemark,
   };
-  const element = renderFunctionComponentToElement(
+  return renderFunctionComponentToElement(
     TrainingScreen as unknown as (p: typeof props) => React.ReactElement,
     props,
-    { 4: false, 9: true },
+    { 4: false, 9: true, ...stateOverrides },
   );
+}
+
+function renderCompletionModal(training: TrainingRecord, onOpenGeneralRemark: (t: TrainingRecord) => void) {
+  const element = renderTrainingScreen(training, onOpenGeneralRemark);
   const modals = findElementsByType(element, Modal);
   // The completion modal is the first Modal in TrainingScreen's JSX.
   return modals[0];
 }
 
 describe('TrainingScreen completion modal', () => {
-  it('shows «Просмотр», «Общее замечание» and «Начать новую» actions once a series completes', () => {
+  it('leaves only «Просмотр» as a Modal.actions dismiss action once a series completes', () => {
     const onOpenGeneralRemark = vi.fn();
     const modal = renderCompletionModal(completedTraining(10), onOpenGeneralRemark);
     const labels = (modal.props as { actions: { label: string }[] }).actions.map((a) => a.label);
-    expect(labels).toEqual(['Просмотр', 'Общее замечание', 'Начать новую']);
+    expect(labels).toEqual(['Просмотр']);
+  });
+
+  it('shows «Общее замечание» and «Начать новую» as vertical-stack buttons in that order', () => {
+    const modal = renderCompletionModal(completedTraining(10), () => {});
+    const markup = renderToStaticMarkup(modal.props.children as React.ReactElement);
+    const remarkIdx = markup.indexOf('Общее замечание');
+    const newIdx = markup.indexOf('Начать новую');
+    expect(remarkIdx).toBeGreaterThan(-1);
+    expect(newIdx).toBeGreaterThan(-1);
+    expect(remarkIdx).toBeLessThan(newIdx);
+    expect(markup).not.toContain('Анализ с AI');
   });
 
   it('«Общее замечание» action calls onOpenGeneralRemark with the current training without closing into edit mode first', () => {
     const onOpenGeneralRemark = vi.fn();
     const training = completedTraining(10);
     const modal = renderCompletionModal(training, onOpenGeneralRemark);
-    const remarkAction = (modal.props as { actions: { label: string; onClick: () => void }[] }).actions
-      .find((a) => a.label === 'Общее замечание')!;
-    remarkAction.onClick();
+    const children = modal.props.children as React.ReactElement;
+    const buttons = findElementsByType(children, 'button');
+    const remarkButton = buttons.find(
+      (b) => (b.props as { children?: unknown }).children === 'Общее замечание',
+    )!;
+    (remarkButton.props as { onClick: () => void }).onClick();
     expect(onOpenGeneralRemark).toHaveBeenCalledWith(training);
   });
 
