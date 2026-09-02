@@ -152,8 +152,10 @@ export default function AiAnalysisModal({ athlete, apiKey, model, onClose }: Pro
           {entries.length === 0 && <p className={s.info}>Нет тренировок для анализа.</p>}
           <ul className={s.list}>
             {entries.map(({ training, shots }) => {
-              const committedCount = shots.filter(sh => sh.status === 'committed').length;
-              const sum = shots.filter(sh => sh.status === 'committed').reduce((acc, sh) => acc + sh.score, 0) / 10;
+              const committed = shots.filter(sh => sh.status === 'committed');
+              const committedCount = committed.length;
+              const intSum = committed.reduce((acc, sh) => acc + Math.floor(sh.score / 10), 0);
+              const decSum = committed.reduce((acc, sh) => acc + sh.score, 0) / 10;
               return (
                 <li key={training.id} className={s.listItem}>
                   <label className={s.checkboxLabel}>
@@ -162,7 +164,7 @@ export default function AiAnalysisModal({ athlete, apiKey, model, onClose }: Pro
                       checked={!!selected[training.id]}
                       onChange={() => toggle(training.id)}
                     />
-                    <span>{training.startedAt.slice(0, 10)} — {sum.toFixed(1)} ({committedCount} выст.)</span>
+                    <span>{training.startedAt.slice(0, 10)} — {intSum} ({decSum.toFixed(1)}) · {committedCount} выст.</span>
                   </label>
                 </li>
               );
@@ -245,6 +247,7 @@ function describeError(e: any): string {
   if (status === 401) return 'Ключ отозван, войдите снова через OpenRouter.';
   if (status === 402) return 'Недостаточно кредитов на аккаунте OpenRouter.';
   if (status === 429) return 'Превышен лимит запросов, попробуйте позже.';
+  if (status === 404) return 'Выбранная модель недоступна. Попробуйте другую модель в настройках.';
   if (typeof navigator !== 'undefined' && !navigator.onLine) return 'Нет подключения к интернету.';
   return e?.message ?? 'Не удалось выполнить анализ.';
 }
