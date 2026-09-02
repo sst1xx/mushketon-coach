@@ -16,7 +16,8 @@ import AllShotsScreen from './screens/AllShotsScreen';
 import type { CommentRecord, ShotRecord } from './db/schema';
 import { getTrainingMode, getPp3CurrentSeriesNumber } from './domain/trainingMode';
 import { applyTheme, isThemeMode } from './utils/theme';
-import { getSetting } from './db/settings';
+import { getSetting, setSetting } from './db/settings';
+import { exchangeCode } from './ai/openrouter';
 import styles from './App.module.css';
 
 /**
@@ -85,6 +86,33 @@ export default function App() {
         applyTheme(isThemeMode(themeMode) ? themeMode : 'light');
         const ep = await readEpoch(db);
         setEpoch(ep);
+
+        // OpenRouter OAuth PKCE callback (see PLAN-AI-ANALYSIS.md §4): the
+        // verifier is stashed in localStorage (not sessionStorage) before
+        // the redirect because iOS PWA standalone mode may hand the
+        // callback to a separate browser context with its own session
+        // storage. Strip `?code=` from the URL immediately so it never
+        // lingers in history or gets cached by the service worker.
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+          // Order matters: replaceState first (URL cleanup), then remove
+          // verifier (one-time use), then exchangeCode (uses the verifier
+          // value saved above before it was removed from localStorage).
+          history.replaceState({}, '', location.pathname);
+          const verifier = localStorage.getItem('or_pkce_verifier');
+          localStorage.removeItem('or_pkce_verifier');
+          if (verifier) {
+            const callbackUrl = window.location.origin + window.location.pathname;
+            try {
+              const key = await exchangeCode(code, verifier, callbackUrl);
+              await setSetting(db, 'openrouterToken', key);
+            } catch (e) {
+              console.error('OpenRouter auth exchange failed', e);
+            }
+          }
+        }
+
         setReady(true);
       } catch (e: any) {
         setError(e?.message ?? 'Ошибка инициализации');

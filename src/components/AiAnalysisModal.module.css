@@ -1,0 +1,108 @@
+.info {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  background: var(--color-bg-card);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+}
+
+.progress span {
+  font-family: monospace;
+}
+
+.warn {
+  font-size: 14px;
+  color: var(--color-danger);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.listItem {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--touch-target-min);
+  font-size: 14px;
+  color: var(--color-text-main);
+  cursor: pointer;
+}
+
+.selectRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--color-border-focus);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btnGhost {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-main);
+  cursor: pointer;
+  min-height: var(--touch-target-min);
+}
+
+.btnPrimary {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-primary-solid);
+  color: #fff;
+  cursor: pointer;
+  min-height: var(--touch-target-min);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.result {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-main);
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
