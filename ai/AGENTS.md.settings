@@ -142,17 +142,21 @@ Stack: TypeScript, React 18, Vite 5, vite-plugin-pwa, raw IndexedDB, Vitest + fa
 - Deletion requires confirmation.
 - Shot comments (remarks) are implemented: `commentRepo` + `RemarksScreen`, comments link to their
   training shots.
-- "Анализ — в разработке" in `SettingsScreen` stays a stub.
+- AI analysis is implemented: `SettingsScreen` → «Анализ с AI» section, OpenRouter OAuth PKCE
+  login, dynamic free-model list, multi-training selection, JSON prompt with all shot data and
+  comments, response shown in a modal. See `docs/plans/PLAN-AI-ANALYSIS.md`.
 
-Not in MVP: analysis, charts, group stats, sighting/match series, sync, accounts, cloud DB,
-electronic-target integration, camera recognition, competitions, per-training export.
+Not in MVP: charts, group stats, sighting/match series, sync, accounts, cloud DB,
+electronic-target integration, camera recognition, competitions, per-training export,
+AI analysis history, streaming AI response.
 
 ## 6. Status
 
 Done: scoring, transform, IndexedDB layer, domain repos, all five screens, shot remarks,
-backup/restore, PWA, CSP, GitHub Pages deploy workflow, Cloudflare Pages config. Tests green (344).
+backup/restore, PWA, CSP, GitHub Pages deploy workflow, Cloudflare Pages config,
+AI analysis (OpenRouter OAuth, free-model list, multi-training select, JSON prompt, modal response). Tests green (587).
 Partial: ISSF target visuals — verify against `docs/reference/CHANGES-TARGET-VISUAL.md` before touching.
-Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6); analysis module.
+Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6).
 
 ## 7. Delegating to helper agents
 
