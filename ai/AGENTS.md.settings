@@ -67,6 +67,9 @@ Test conventions:
   `targetCanvas.render.test.tsx`, `Modal.test.tsx`.
 - IndexedDB tests start with `import 'fake-indexeddb/auto';`.
 - `npm run build` type-checks via `tsconfig.app.json`, which does not cover test files.
+- Every new function, module, or non-trivial logic change must be covered by tests to the maximum
+  practical extent: happy path, edge cases (empty input, boundary values, missing fields), and error
+  paths. A `worker` deliverable without tests for new logic will be rejected by `reviewer`.
 
 ## 3. Where things are
 
@@ -196,6 +199,11 @@ own config, not in this file (see rule 9 in §1).
 Rules:
 - The coordinator **never** edits code and **never** deploys — it always delegates to `worker` and
   never falls back to doing the work itself. `worker` is the only role that changes code or deploys.
+- The **main session is coordination-only**: it reads files for context, plans, delegates, and
+  reviews results — it never edits files, runs builds, or executes deploys directly. Every code
+  change, test run, build, and deploy goes through a subagent (`worker` for writes, others for
+  read-only tasks). This applies without exception unless the user explicitly says otherwise in that
+  specific request.
 - `reviewer` is **mandatory** after every `worker` change — no exceptions for size or triviality
   (including docs, comments, formatting). It only reports findings and never edits files; every fix
   goes back to `worker`, which re-verifies and is then re-reviewed.

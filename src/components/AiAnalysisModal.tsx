@@ -215,7 +215,7 @@ export default function AiAnalysisModal({ athlete, apiKey, model, onClose }: Pro
 
       {phase === 'result' && (
         <div>
-          <div className={s.result}>{result}</div>
+          <div className={s.result}>{renderSections(result)}</div>
           <div className={s.actions}>
             <button className={s.btnGhost} onClick={handleCopy}>Копировать</button>
             <button className={s.btnPrimary} onClick={onClose}>Закрыть</button>
@@ -240,6 +240,24 @@ function fmtBytes(b: number): string {
   if (b < 1024) return `${b} Б`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} КБ`;
   return `${(b / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+export function renderSections(src: string): React.ReactNode[] {
+  const parts = src.split(/(?=^## )/m);
+  return parts.map((section, i) => {
+    if (!section.startsWith('## ')) {
+      return section.trim() ? <p key={i} className={s.resultPara}>{section.trim()}</p> : null;
+    }
+    const nl = section.indexOf('\n');
+    const heading = nl === -1 ? section.slice(3).trim() : section.slice(3, nl).trim();
+    const body = nl === -1 ? '' : section.slice(nl + 1).trim();
+    return (
+      <React.Fragment key={i}>
+        <h2 className={s.resultHeading}>{heading}</h2>
+        {body && <p className={s.resultPara}>{body}</p>}
+      </React.Fragment>
+    );
+  }).filter(Boolean) as React.ReactNode[];
 }
 
 function describeError(e: any): string {

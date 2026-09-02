@@ -98,11 +98,30 @@
 }
 
 .result {
-  white-space: pre-wrap;
   font-size: 14px;
   line-height: 1.5;
   color: var(--color-text-main);
   max-height: 50vh;
   overflow-y: auto;
   margin-bottom: 12px;
+}
+
+.resultHeading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-main);
+  margin: 16px 0 4px;
+  padding: 0;
+}
+
+.resultHeading:first-child {
+  margin-top: 0;
+}
+
+.resultPara {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-main);
+  white-space: pre-wrap;
+  margin: 0 0 4px;
 }
