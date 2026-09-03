@@ -221,6 +221,10 @@ Rules:
   substitute for or implicitly authorized by a request to deploy to the other.
 - Never use `oracle` for recon or routine review; never use `worker` for read-only questions;
   never use `researcher` for repo recon; never use `delegate` for code changes or review.
+- **Parallelism rule**: when subtasks are safe to run concurrently (e.g. independent `worker`
+  branches in separate worktrees, or multiple `reviewer` passes on separate files), launch the
+  corresponding subagents in parallel using `runs.all([...])`. Use a single sequential thread only
+  when tasks share mutable state, depend on each other's output, or write to the same worktree.
 
 ## 8. Worktrees
 
