@@ -30,7 +30,7 @@ function entry(id: string, trainingId: string, globalNumber: number): AllShotsEn
 function renderScreen(
   entries: AllShotsEntry[],
   trainings: TrainingRecord[],
-  selectedTrainingIds: Set<string> = new Set(),
+  selectedTrainingIds: Set<string> | null = null,
 ) {
   const props = { athlete, onBack: () => {} };
   const element = renderFunctionComponentToElement(
@@ -50,10 +50,10 @@ describe('AllShotsScreen chip row', () => {
     expect(chipButtons.length).toBe(3); // Все + 2 trainings
   });
 
-  it('marks the [Все] chip as pressed when selectedTrainingIds is empty', () => {
+  it('marks the [Все] chip as pressed when selectedTrainingIds is null', () => {
     const trainings = [training('t1', '2024-07-21T10:00:00.000Z')];
     const entries = [entry('s1', 't1', 1)];
-    const markup = renderScreen(entries, trainings, new Set());
+    const markup = renderScreen(entries, trainings, null);
     const allChipMatch = markup.match(/<button[^>]*>Все<\/button>/);
     expect(allChipMatch![0]).toContain('aria-pressed="true"');
   });
@@ -69,7 +69,7 @@ describe('AllShotsScreen chip row', () => {
   it('shows the training date in the score label when multiple trainings are displayed', () => {
     const trainings = [training('t1', '2024-07-21T10:00:00.000Z'), training('t2', '2024-08-03T10:00:00.000Z')];
     const entries = [entry('s1', 't1', 1), entry('s2', 't2', 2)];
-    const markup = renderScreen(entries, trainings, new Set());
+    const markup = renderScreen(entries, trainings, null);
     expect(markup).toContain('(21 июл.)');
   });
 

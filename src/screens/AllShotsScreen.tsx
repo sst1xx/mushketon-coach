@@ -4,7 +4,7 @@ import { AthleteRecord, TrainingRecord } from '../db/schema';
 import { listAllShotsForAthlete, AllShotsEntry } from '../domain/allShotsRepo';
 import { listTrainings } from '../domain/trainingRepo';
 import { formatCommentLine, formatShotLabel } from './allShotsCaption';
-import { filterAllShotsEntries } from './allShotsFilter';
+import { filterAllShotsEntries, toggleAllTrainingsFilter } from './allShotsFilter';
 import TargetCanvas from '../components/TargetCanvas';
 import { getSetting, setSetting } from '../db/settings';
 import s from './AllShotsScreen.module.css';
@@ -29,7 +29,7 @@ interface Props {
 export default function AllShotsScreen({ athlete, onBack }: Props) {
   const [entries, setEntries] = useState<AllShotsEntry[]>([]);
   const [trainings, setTrainings] = useState<TrainingRecord[]>([]);
-  const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string>>(new Set());
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string> | null>(null);
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [zoomMode, setZoomMode] = useState<'full' | 'zoom7' | 'zoom9'>('full');
@@ -73,9 +73,9 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
     return [...dateCounts.values()].some((count) => count >= 2);
   }, [trainingsChronological]);
 
-  // Empty selectedTrainingIds means "no filter" — the [Все] chip represents this state.
+  // null means "show all" ([Все] chip active); empty Set means nothing selected.
   const displayedEntries = useMemo(
-    () => filterAllShotsEntries(entries, selectedTrainingIds.size === 0 ? null : selectedTrainingIds),
+    () => filterAllShotsEntries(entries, selectedTrainingIds),
     [entries, selectedTrainingIds],
   );
 
@@ -115,12 +115,12 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
   };
 
   const toggleAllChip = () => {
-    setSelectedTrainingIds(new Set());
+    setSelectedTrainingIds(toggleAllTrainingsFilter);
   };
 
   const toggleTrainingChip = (trainingId: string) => {
     setSelectedTrainingIds((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev ?? []);
       if (next.has(trainingId)) next.delete(trainingId);
       else next.add(trainingId);
       return next;
@@ -140,8 +140,8 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
         <div className={s.chipTrack}>
           <button
             type="button"
-            className={selectedTrainingIds.size === 0 ? s.chipActive : s.chip}
-            aria-pressed={selectedTrainingIds.size === 0}
+            className={selectedTrainingIds === null ? s.chipActive : s.chip}
+            aria-pressed={selectedTrainingIds === null}
             onClick={toggleAllChip}
           >
             Все
@@ -150,7 +150,7 @@ export default function AllShotsScreen({ athlete, onBack }: Props) {
             const startedAt = new Date(training.startedAt);
             const dateLabel = trainingDateFormatter.format(startedAt);
             const label = needsTimeInLabel ? `${dateLabel}, ${trainingTimeFormatter.format(startedAt)}` : dateLabel;
-            const isSelected = selectedTrainingIds.has(training.id);
+            const isSelected = selectedTrainingIds !== null && selectedTrainingIds.has(training.id);
             return (
               <button
                 key={training.id}
