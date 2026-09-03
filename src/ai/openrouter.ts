@@ -79,6 +79,14 @@ export async function fetchFreeModels(apiKey: string): Promise<AiModel[]> {
     if (b.id === DEFAULT_MODEL) return 1;
     return a.name.localeCompare(b.name);
   });
+  // Ensure openrouter/free is always the first option.
+  const freeRouterIdx = models.findIndex(m => m.id === 'openrouter/free');
+  if (freeRouterIdx > 0) {
+    models.splice(freeRouterIdx, 1);
+  }
+  if (freeRouterIdx !== 0) {
+    models.unshift({ id: 'openrouter/free', name: 'Free Router (случайная бесплатная)' });
+  }
   return models;
 }
 

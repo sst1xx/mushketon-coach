@@ -6,7 +6,7 @@ import { applyTheme, isThemeMode, type ThemeMode } from '../utils/theme';
 import Modal from '../components/Modal';
 import AiAnalysisModal from '../components/AiAnalysisModal';
 import { generatePkce, getAuthUrl, fetchFreeModels } from '../ai/openrouter';
-import { DEFAULT_MODEL, type AiModel } from '../ai/models';
+import { DEFAULT_MODEL, selectModel, type AiModel } from '../ai/models';
 import { listAthletes } from '../domain/athleteRepo';
 import type { AthleteRecord } from '../db/schema';
 import s from './SettingsScreen.module.css';
@@ -39,34 +39,50 @@ export default function SettingsScreen({ onBack }: Props) {
   const [analysisAthlete, setAnalysisAthlete] = useState<AthleteRecord | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       if ('storage' in navigator) {
         const est = await navigator.storage.estimate();
+        if (cancelled) return;
         setStorageInfo({ usage: est.usage ?? 0, quota: est.quota ?? 0 });
       }
       const db = await openDB();
       const persisted = await getSetting(db, 'storagePersisted');
+      if (cancelled) return;
       setStoragePersisted(persisted as boolean | null);
       const tm = await getSetting(db, 'themeMode');
+      if (cancelled) return;
       if (isThemeMode(tm)) setThemeMode(tm);
 
       const token = await getSetting(db, 'openrouterToken');
+      if (cancelled) return;
+      let loadedModels: AiModel[] = [];
       if (typeof token === 'string' && token) {
         setApiKey(token);
         try {
-          const models = await fetchFreeModels(token);
-          setFreeModels(models);
+          loadedModels = await fetchFreeModels(token);
+          if (cancelled) return;
+          setFreeModels(loadedModels);
         } catch {
+          if (cancelled) return;
           setAiStatus('Не удалось загрузить список бесплатных моделей.');
         }
       }
       const savedModel = await getSetting(db, 'aiModel');
-      if (typeof savedModel === 'string' && savedModel) setAiModel(savedModel);
+      if (cancelled) return;
+      const modelIds = loadedModels.map(m => m.id);
+      const chosen = selectModel(savedModel as string | null, modelIds);
+      if (chosen) {
+        setAiModel(chosen);
+        if (chosen !== savedModel) await setSetting(db, 'aiModel', chosen);
+      }
 
       const list = await listAthletes();
+      if (cancelled) return;
       setAthletes(list);
       if (list.length > 0) setSelectedAthleteId(list[0].id);
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const handleAiLogin = async () => {

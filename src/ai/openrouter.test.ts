@@ -48,13 +48,12 @@ describe('exchangeCode', () => {
 });
 
 describe('fetchFreeModels', () => {
-  it('keeps only fully free, text->text models and sorts DEFAULT_MODEL first', async () => {
+  it('keeps only fully free, text->text models; openrouter/free is always first', async () => {
     const data = {
       data: [
         { id: 'paid/model', name: 'Paid Model', pricing: { prompt: '0.001', completion: '0' }, architecture: { modality: 'text->text' } },
         { id: 'z/other-free', name: 'Z Other Free', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'text->text' } },
         { id: 'audio/free-audio', name: 'Free Audio', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'audio->audio' } },
-        { id: DEFAULT_MODEL, name: 'Default Model', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'text->text' } },
         { id: 'a/another-free', name: 'A Another Free', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'text->text' } },
       ],
     };
@@ -64,7 +63,26 @@ describe('fetchFreeModels', () => {
     }));
 
     const models = await fetchFreeModels('sk-test');
-    expect(models.map(m => m.id)).toEqual([DEFAULT_MODEL, 'a/another-free', 'z/other-free']);
+    // openrouter/free prepended; paid and audio filtered out; rest sorted alphabetically
+    expect(models.map(m => m.id)).toEqual(['openrouter/free', 'a/another-free', 'z/other-free']);
+  });
+
+  it('prepends openrouter/free via unshift even when absent from API response', async () => {
+    // Validates the unshift guard: if the API returns no openrouter/free entry,
+    // fetchFreeModels still inserts it first.
+    const data = {
+      data: [
+        { id: 'z/other-free', name: 'Z Other Free', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'text->text' } },
+        { id: 'a/another-free', name: 'A Another Free', pricing: { prompt: '0', completion: '0' }, architecture: { modality: 'text->text' } },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => data,
+    }));
+    const models = await fetchFreeModels('sk-test');
+    expect(models[0].id).toBe('openrouter/free');
+    expect(models.map(m => m.id)).toEqual(['openrouter/free', 'a/another-free', 'z/other-free']);
   });
 
   it('throws when the response is not ok', async () => {
