@@ -72,6 +72,10 @@ describe('TrainingRemarksScreen', () => {
     expect(renderScreen(training(10), null)).toContain('Дневник · Серия');
   });
 
+  it('titles the screen "Дневник · Пристрелка" for pristrelka', () => {
+    expect(renderScreen(training(99), null)).toContain('Дневник · Пристрелка');
+  });
+
   it('titles the screen "Дневник · Серия N" for a specific ПП-3 series', () => {
     expect(renderScreen(training(60), 3)).toContain('Дневник · Серия 3');
   });

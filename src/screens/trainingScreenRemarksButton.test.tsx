@@ -61,14 +61,19 @@ describe('TrainingScreen header remarks button', () => {
   });
 
   it('labels the button with the selected ПП-3 series number', () => {
-    // selectedSeriesView is useState index 12; pick series 2 explicitly.
-    const markup = renderHeader(training(60), () => {}, { 12: 2 });
+    // selectedSeriesView is useState index 13; pick series 2 explicitly.
+    const markup = renderHeader(training(60), () => {}, { 13: 2 });
     expect(markup).toContain('Дневник · Серия 2');
   });
 
   it('is present even when the series/exercise has no shots yet (no remarks recorded)', () => {
     const markup = renderHeader(training(10), () => {});
     expect(markup).toContain('Дневник · Серия');
+  });
+
+  it('labels the button «Дневник · Пристрелка» for pristrelka', () => {
+    const markup = renderHeader(training(99), () => {});
+    expect(markup).toContain('Дневник · Пристрелка');
   });
 
   it('does not render when onOpenTrainingRemarks is not provided', () => {

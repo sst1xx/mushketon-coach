@@ -426,6 +426,42 @@ describe('shotRepo', () => {
     expect(finalShots.filter(s => s.status === 'committed')).toHaveLength(60);
   });
 
+  it('Пристрелка (targetShotCount=99): completes at 99, blocks the 100th shot, and Undo of the 99th re-enables input at 98/99', async () => {
+    const tPristrelka = await createTraining((await createAthlete('Pristrelka')).id, epoch, 99);
+    expect(tPristrelka.completedAt).toBeNull();
+
+    for (let i = 1; i <= 98; i++) {
+      const d = await createDraft(tPristrelka.id, 100 + (i % 50), 200, epoch);
+      await commitShot(d.id, 100 + (i % 50), 200, epoch);
+      const shots = await listShots(tPristrelka.id);
+      const committedCount = shots.filter(s => s.status === 'committed').length;
+      expect(committedCount).toBe(i);
+      expect(shouldCompleteTrainingAfterShot(tPristrelka, committedCount)).toBe(false);
+    }
+
+    const d99 = await createDraft(tPristrelka.id, 110, 200, epoch);
+    await commitShot(d99.id, 110, 200, epoch);
+    const shots99 = await listShots(tPristrelka.id);
+    const count99 = shots99.filter(s => s.status === 'committed').length;
+    expect(count99).toBe(99);
+    expect(shouldCompleteTrainingAfterShot(tPristrelka, count99)).toBe(true);
+    const completedPristrelka = await completeTraining(tPristrelka.id, epoch);
+    expect(completedPristrelka.completedAt).not.toBeNull();
+
+    await expect(createDraft(tPristrelka.id, 120, 200, epoch)).rejects.toThrow(/completed/i);
+
+    expect(await undoLastShot(tPristrelka.id, epoch)).toBe(true);
+    const afterUndo = await listShots(tPristrelka.id);
+    expect(afterUndo.filter(s => s.status === 'committed')).toHaveLength(98);
+    const reopened = await getTraining(tPristrelka.id);
+    expect(reopened?.completedAt).toBeNull();
+
+    const d99again = await createDraft(tPristrelka.id, 111, 200, epoch);
+    await commitShot(d99again.id, 111, 200, epoch);
+    const finalShots = await listShots(tPristrelka.id);
+    expect(finalShots.filter(s => s.status === 'committed')).toHaveLength(99);
+  });
+
   it('pure seam shouldCompleteTrainingAfterShot respects legacy and unlimited trainings', () => {
     const now = new Date().toISOString();
     // Legacy training without targetShotCount field

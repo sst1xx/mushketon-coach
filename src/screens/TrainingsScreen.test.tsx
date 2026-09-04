@@ -40,7 +40,7 @@ describe('TrainingsScreen «+ Новое» button', () => {
     expect(markup).not.toContain('+ Новое упражнение');
   });
 
-  it('shows «Серия» and «Упражнение ПП-3» in the choice modal when showNewModal is true, without a heading', () => {
+  it('shows «Пристрелка», «Серия» and «Упражнение ПП-3» in that exact order in the choice modal when showNewModal is true, without a heading', () => {
     const element = renderScreen({ 5: true });
     const modals = findElementsByType(element, Modal);
     // The choice modal is the one that contains the choice buttons
@@ -54,8 +54,14 @@ describe('TrainingsScreen «+ Новое» button', () => {
     const childrenMarkup = renderToStaticMarkup(
       (choiceModal!.props as { children: React.ReactElement }).children,
     );
+    expect(childrenMarkup).toContain('Пристрелка');
     expect(childrenMarkup).toContain('Серия');
     expect(childrenMarkup).toContain('Упражнение ПП-3');
+    const pristrelkaIdx = childrenMarkup.indexOf('Пристрелка');
+    const seriesIdx = childrenMarkup.indexOf('Серия');
+    const pp3Idx = childrenMarkup.indexOf('Упражнение ПП-3');
+    expect(pristrelkaIdx).toBeLessThan(seriesIdx);
+    expect(seriesIdx).toBeLessThan(pp3Idx);
     expect(childrenMarkup).not.toContain('Начать новое');
   });
 

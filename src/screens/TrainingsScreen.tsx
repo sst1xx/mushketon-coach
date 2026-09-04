@@ -5,7 +5,7 @@ import { AthleteRecord, TrainingRecord } from '../db/schema';
 import { createTraining, listTrainings, deleteTraining } from '../domain/trainingRepo';
 import { listShots } from '../domain/shotRepo';
 import { formatTrainingTotal } from './trainingTotal';
-import { getTrainingListLabel } from '../domain/trainingMode';
+import { getTrainingListLabel, PP3_SHOT_COUNT, PRISTRELKA_SHOT_COUNT, SERIES_SHOT_COUNT } from '../domain/trainingMode';
 import Modal from '../components/Modal';
 import s from './TrainingsScreen.module.css';
 
@@ -119,8 +119,9 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
          actions={[{ label: 'Отмена', onClick: () => setShowNewModal(false) }]}
        >
          <div className={s.newChoiceActions}>
-           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(10); }}>Серия</button>
-           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(60); }}>Упражнение ПП-3</button>
+           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(PRISTRELKA_SHOT_COUNT); }}>Пристрелка</button>
+           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(SERIES_SHOT_COUNT); }}>Серия</button>
+           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(PP3_SHOT_COUNT); }}>Упражнение ПП-3</button>
          </div>
        </Modal>
      </div>

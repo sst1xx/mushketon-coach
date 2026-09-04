@@ -42,10 +42,16 @@ describe('getTrainingMode', () => {
     expect(getTrainingMode({ targetShotCount: 60 })).toBe('pp3');
   });
 
+  it('recognizes пристрелка (targetShotCount 99)', () => {
+    expect(getTrainingMode({ targetShotCount: 99 })).toBe('pristrelka');
+  });
+
   it('treats null/undefined/other counts as legacy', () => {
     expect(getTrainingMode({ targetShotCount: null })).toBe('legacy');
     expect(getTrainingMode({ targetShotCount: undefined })).toBe('legacy');
     expect(getTrainingMode({ targetShotCount: 30 })).toBe('legacy');
+    expect(getTrainingMode({ targetShotCount: 98 })).toBe('legacy');
+    expect(getTrainingMode({ targetShotCount: 100 })).toBe('legacy');
   });
 });
 
@@ -219,6 +225,11 @@ describe('getTrainingListLabel', () => {
     expect(getTrainingListLabel({ targetShotCount: 60 }, 17)).toBe('ПП-3 · 1/6 серий · 17/60 выстрелов');
   });
 
+  it('labels пристрелка', () => {
+    expect(getTrainingListLabel({ targetShotCount: 99 }, 0)).toBe('Пристрелка · 0/99 выстрелов');
+    expect(getTrainingListLabel({ targetShotCount: 99 }, 99)).toBe('Пристрелка · 99/99 выстрелов');
+  });
+
   it('returns null for legacy records', () => {
     expect(getTrainingListLabel({ targetShotCount: null }, 4)).toBeNull();
     expect(getTrainingListLabel({ targetShotCount: undefined }, 4)).toBeNull();
@@ -238,6 +249,10 @@ describe('getScopedRemarksLabel', () => {
     expect(getScopedRemarksLabel({ targetShotCount: 60 }, 3)).toBe('Дневник · Серия 3');
   });
 
+  it('labels пристрелка with its dedicated title', () => {
+    expect(getScopedRemarksLabel({ targetShotCount: 99 }, null)).toBe('Дневник · Пристрелка');
+  });
+
   it('falls back to a generic label for legacy records', () => {
     expect(getScopedRemarksLabel({ targetShotCount: null }, null)).toBe('Дневник');
   });
@@ -250,6 +265,10 @@ describe('getScopedRemarksShotNumberRange', () => {
 
   it('covers the whole exercise when no ПП-3 series is selected', () => {
     expect(getScopedRemarksShotNumberRange({ targetShotCount: 60 }, null)).toEqual({ start: 1, end: Infinity });
+  });
+
+  it('covers the whole training for пристрелка', () => {
+    expect(getScopedRemarksShotNumberRange({ targetShotCount: 99 }, null)).toEqual({ start: 1, end: Infinity });
   });
 
   it('covers only the selected ПП-3 series window, matching series boundaries', () => {

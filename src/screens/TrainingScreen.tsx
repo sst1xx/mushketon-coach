@@ -28,6 +28,8 @@ import {
   resolvePp3ViewedSeriesNumber,
   isViewingPastPp3Series,
   getScopedRemarksLabel,
+  PP3_SHOT_COUNT,
+  SERIES_SHOT_COUNT,
 } from '../domain/trainingMode';
 import {
   createComment,
@@ -85,6 +87,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const [completedModalDismissed, setCompletedModalDismissed] = useState(false);
   // "Начать новую" choice modal: "Серия" / "Упражнение ПП-3"
   const [showNewChoiceModal, setShowNewChoiceModal] = useState(false);
+  const [showPristrelkaExitConfirm, setShowPristrelkaExitConfirm] = useState(false);
   // ПП-3 series chip picked to view/edit; null falls back to the current series
   const [selectedSeriesView, setSelectedSeriesView] = useState<number | null>(restoreSeriesView ?? null);
   // Commit confirmation toast ("№N • 10.4") shown briefly after each committed shot
@@ -127,6 +130,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const isLimited = typeof currentTraining.targetShotCount === 'number' && currentTraining.targetShotCount > 0;
   const limit = currentTraining.targetShotCount ?? null;
   const mode = getTrainingMode(currentTraining);
+  const isPristrelka = mode === 'pristrelka';
   const committedShots = shots.filter(s => s.status === 'committed');
   // The series shown on the target lags behind committedCount on purpose:
   // it switches only once a shot (draft or committed) beyond the current
@@ -159,6 +163,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   const headerProgressLabel = (() => {
     if (mode === 'series') return `Серия · ${committedCount}/${limit}`;
     if (mode === 'pp3') return `Серия ${pp3CurrentSeries}/6 · ${committedCount}/${limit}`;
+    if (mode === 'pristrelka') return `Пристрелка · ${committedCount}/${limit}`;
     return isLimited ? `Выстрелы: ${committedCount} / ${limit}` : `Выстрелы: ${committedCount}`;
   })();
 
@@ -267,6 +272,23 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     }
   };
 
+  const handleBack = () => {
+    if (isPristrelka && !isCompleted) {
+      setShowPristrelkaExitConfirm(true);
+      return;
+    }
+    onBack();
+  };
+
+  const handleCompletePristrelkaEarly = async () => {
+    const db = await openDB();
+    const ep = await readEpoch(db);
+    const completed = await completeTraining(currentTraining.id, ep);
+    setCurrentTraining(completed);
+    setShowPristrelkaExitConfirm(false);
+    setShowNewChoiceModal(true);
+  };
+
   // Create new training for the current athlete
   const handleCreateNewTraining = async (targetShotCount: number) => {
     const db = await openDB();
@@ -327,7 +349,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
     <div className={s.page}>
       {/* Header */}
       <div className={s.header}>
-        <button className={s.back} onClick={onBack}>◀ Назад</button>
+        <button className={s.back} onClick={handleBack}>◀ Назад</button>
         <span className={s.athleteName}>{athlete.name}</span>
         {isCompleted && completedModalDismissed && (
           <button
@@ -355,7 +377,13 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         <div className={s.completedBanner}>
           <span className={s.completedBannerText}>
             {isCompleted
-              ? (mode === 'pp3' ? 'Упражнение ПП-3 завершено' : mode === 'series' ? 'Серия завершена' : 'Тренировка завершена')
+              ? (mode === 'pp3'
+                ? 'Упражнение ПП-3 завершено'
+                : mode === 'series'
+                  ? 'Серия завершена'
+                  : mode === 'pristrelka'
+                    ? 'Пристрелка завершена'
+                    : 'Тренировка завершена')
               : `ПП-3 · Серия ${pp3CurrentSeries} из 6`}
           </span>
           {pp3Blocks && (
@@ -485,9 +513,16 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
           { label: 'Просмотр', onClick: () => { setShowCompletedModal(false); setCompletedModalDismissed(true); } },
         ]}
       >
-        <p className={s.dialogHeading}>{mode === 'pp3' ? 'упражнение ПП-3 завершено' : 'серия завершена'}</p>
+        <p className={s.dialogHeading}>
+          {mode === 'pp3' ? 'упражнение ПП-3 завершено' : mode === 'pristrelka' ? 'пристрелка завершена' : 'серия завершена'}
+        </p>
         <p className={s.dialogInfo}>
-          Выполнено {committedCount} из {limit ?? committedCount} выстрелов. Достигнут лимит серии.
+          Выполнено {committedCount} из {limit ?? committedCount} выстрелов.
+          {mode === 'pp3'
+            ? ' Достигнут лимит упражнения.'
+            : mode === 'pristrelka'
+              ? ' Достигнут лимит пристрелки.'
+              : ' Достигнут лимит серии.'}
         </p>
         <div className={s.newChoiceActions}>
           <button
@@ -513,9 +548,20 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         actions={[{ label: 'Отмена', onClick: () => setShowNewChoiceModal(false) }]}
       >
         <div className={s.newChoiceActions}>
-          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(10)}>Серия</button>
-          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(60)}>Упражнение ПП-3</button>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(SERIES_SHOT_COUNT)}>Серия</button>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(PP3_SHOT_COUNT)}>Упражнение ПП-3</button>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPristrelkaExitConfirm}
+        onClose={() => setShowPristrelkaExitConfirm(false)}
+        actions={[
+          { label: 'Отмена', onClick: () => setShowPristrelkaExitConfirm(false) },
+          { label: 'Завершить', onClick: handleCompletePristrelkaEarly },
+        ]}
+      >
+        <p className={s.dialogHeading}>Завершить пристрелку?</p>
       </Modal>
 
       {/* Comment modal */}

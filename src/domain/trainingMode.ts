@@ -6,15 +6,17 @@ import type { ShotRecord, TrainingRecord } from '../db/schema';
  * `60` is a ПП-3 exercise (6 series of 10), anything else (including
  * null/undefined) is a legacy unlimited record.
  */
-export type TrainingMode = 'series' | 'pp3' | 'legacy';
+export type TrainingMode = 'series' | 'pp3' | 'pristrelka' | 'legacy';
 
 export const SERIES_SHOT_COUNT = 10;
 export const PP3_SERIES_COUNT = 6;
 export const PP3_SHOT_COUNT = SERIES_SHOT_COUNT * PP3_SERIES_COUNT;
+export const PRISTRELKA_SHOT_COUNT = 99;
 
 export function getTrainingMode(training: Pick<TrainingRecord, 'targetShotCount'>): TrainingMode {
   if (training.targetShotCount === SERIES_SHOT_COUNT) return 'series';
   if (training.targetShotCount === PP3_SHOT_COUNT) return 'pp3';
+  if (training.targetShotCount === PRISTRELKA_SHOT_COUNT) return 'pristrelka';
   return 'legacy';
 }
 
@@ -147,6 +149,7 @@ export function getScopedRemarksLabel(
   if (mode === 'pp3') {
     return seriesNumber !== null ? `Дневник · Серия ${seriesNumber}` : 'Дневник · Упражнение';
   }
+  if (mode === 'pristrelka') return 'Дневник · Пристрелка';
   if (mode === 'series') return 'Дневник · Серия';
   return 'Дневник';
 }
@@ -197,5 +200,6 @@ export function getTrainingListLabel(
     const completedSeries = Math.min(PP3_SERIES_COUNT, Math.floor(committedCount / SERIES_SHOT_COUNT));
     return `ПП-3 · ${completedSeries}/${PP3_SERIES_COUNT} серий · ${committedCount}/${PP3_SHOT_COUNT} выстрелов`;
   }
+  if (mode === 'pristrelka') return `Пристрелка · ${committedCount}/${PRISTRELKA_SHOT_COUNT} выстрелов`;
   return null;
 }
