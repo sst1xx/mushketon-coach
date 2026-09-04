@@ -83,7 +83,7 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
   // button after the coach dismissed it into review mode — see completedModalDismissed).
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [completedModalDismissed, setCompletedModalDismissed] = useState(false);
-  // "Начать новую" choice modal: "+ Новая серия" / "+ Новое упражнение"
+  // "Начать новую" choice modal: "Серия" / "Упражнение ПП-3"
   const [showNewChoiceModal, setShowNewChoiceModal] = useState(false);
   // ПП-3 series chip picked to view/edit; null falls back to the current series
   const [selectedSeriesView, setSelectedSeriesView] = useState<number | null>(restoreSeriesView ?? null);
@@ -512,10 +512,9 @@ export default function TrainingScreen({ athlete, training, epoch, onBack, onNew
         onClose={() => setShowNewChoiceModal(false)}
         actions={[{ label: 'Отмена', onClick: () => setShowNewChoiceModal(false) }]}
       >
-        <p className={s.dialogHeading}>Начать новую</p>
         <div className={s.newChoiceActions}>
-          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(10)}>+ Новая серия</button>
-          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(60)}>+ Новое упражнение</button>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(10)}>Серия</button>
+          <button className={s.newChoiceBtn} onClick={() => handleCreateNewTraining(60)}>Упражнение ПП-3</button>
         </div>
       </Modal>
 

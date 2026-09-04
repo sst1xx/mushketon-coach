@@ -100,3 +100,19 @@ describe('TrainingScreen completion modal', () => {
     expect(pp3Markup).toContain('упражнение ПП-3 завершено');
   });
 });
+
+describe('TrainingScreen «Начать новую» choice modal', () => {
+  it('shows «Серия» and «Упражнение ПП-3» in the choice modal without a heading', () => {
+    const element = renderTrainingScreen(completedTraining(10), () => {}, { 11: true });
+    const modals = findElementsByType(element, Modal);
+    // showNewChoiceModal is the second Modal in TrainingScreen JSX
+    const choiceModal = modals[1];
+    expect(choiceModal).toBeDefined();
+    const markup = renderToStaticMarkup(choiceModal.props.children as React.ReactElement);
+    expect(markup).toContain('Серия');
+    expect(markup).toContain('Упражнение ПП-3');
+    expect(markup).not.toContain('+ Новая серия');
+    expect(markup).not.toContain('+ Новое упражнение');
+    expect(markup).not.toContain('Начать новую');
+  });
+});

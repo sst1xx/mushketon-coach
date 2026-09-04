@@ -24,6 +24,7 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
   const [modeLabels, setModeLabels] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<TrainingRecord | null>(null);
+  const [showNewModal, setShowNewModal] = useState(false);
 
   const load = useCallback(async () => {
     const list = await listTrainings(athlete.id);
@@ -97,8 +98,7 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
        </ul>
 
        <div className={s.newActions}>
-         <button className={s.addBtn} onClick={() => handleNew(10)}>+ Новая серия</button>
-         <button className={s.addBtn} onClick={() => handleNew(60)}>+ Новое упражнение</button>
+         <button className={s.addBtn} onClick={() => setShowNewModal(true)}>+ Новое</button>
        </div>
 
        <Modal
@@ -111,6 +111,17 @@ export default function TrainingsScreen({ athlete, epoch, onBack, onSelectTraini
        >
          <p>Удалить тренировку от <strong>{confirmDelete && formatDate(confirmDelete.startedAt)}</strong>?</p>
          <p className={s.warn}>Это действие нельзя отменить.</p>
+       </Modal>
+
+       <Modal
+         isOpen={showNewModal}
+         onClose={() => setShowNewModal(false)}
+         actions={[{ label: 'Отмена', onClick: () => setShowNewModal(false) }]}
+       >
+         <div className={s.newChoiceActions}>
+           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(10); }}>Серия</button>
+           <button className={s.choiceBtn} onClick={() => { setShowNewModal(false); handleNew(60); }}>Упражнение ПП-3</button>
+         </div>
        </Modal>
      </div>
    );
