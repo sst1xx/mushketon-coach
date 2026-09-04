@@ -54,6 +54,71 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('targetShotCount');
     expect(prompt).toContain('ПРОМАХ');
   });
+
+  it('contains "вы" addressing the athlete', () => {
+    const prompt = buildSystemPrompt();
+    // The standalone pronoun 'вы' (polite address) must be present
+    expect(prompt.toLowerCase()).toMatch(/вы/);
+  });
+
+  it('does not address athlete as "тебе" or "твой" in coaching instructions', () => {
+    const prompt = buildSystemPrompt();
+    // No direct addresses to the athlete as ты-form recipient of the report
+    expect(prompt).not.toMatch(/тебе/i);
+    expect(prompt).not.toContain('твой фокус');
+    expect(prompt).not.toContain('Фокус стрелка');
+  });
+
+  it('section 4 describes arithmetic as an internal step, not output', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('внутренний шаг');
+  });
+
+  it('section 4 contains explicit ban on x/y, mm/cm, averages, medians, sums, percents, stddev', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('координаты x/y');
+    expect(prompt).toContain('мм/см');
+    expect(prompt).toContain('СКО');
+    expect(prompt).toContain('разбросы');
+  });
+
+  it('section 5 does not list all metrics as mandatory output', () => {
+    const prompt = buildSystemPrompt();
+    // Old mandatory metric list should be gone
+    expect(prompt).not.toContain('Оцени: количество выстрелов, общий результат');
+    // Should focus on practical action
+    expect(prompt.toLowerCase()).toContain('практическое значение');
+  });
+
+  it('number whitelist rule is present in formatting rules', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('белого списка');
+    // Check ban on specific items
+    expect(prompt).toContain('медианы');
+    expect(prompt).toContain('суммы');
+  });
+
+  it('does not have "Итог тренировки" header', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).not.toContain('Итог тренировки');
+  });
+
+  it('has "Следующая тренировка" section header', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('## Следующая тренировка');
+  });
+
+  it('has "Ваш фокус" section header instead of "Фокус стрелка"', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('## Ваш фокус');
+    expect(prompt).not.toContain('## Фокус стрелка');
+  });
+
+  it('still uses ISSF decimal for individual shot scores', () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain('ISSF decimal');
+    expect(prompt).toContain('10.9');
+  });
 });
 
 describe('buildUserPrompt', () => {
