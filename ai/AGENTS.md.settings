@@ -47,7 +47,7 @@ All commands run **inside a `wt-*/` worktree**, not in the container root and no
 ```bash
 npm install
 npm run dev        # Vite dev server
-npx vitest run     # tests — must stay green (344 passing, 11 files)
+npx vitest run     # tests — must stay green
 npm run build      # tsc -p tsconfig.app.json + vite build → dist/
 npm run preview
 ```
@@ -81,7 +81,8 @@ src/domain/           athleteRepo, trainingRepo, shotRepo, commentRepo, backupSe
 src/components/       TargetCanvas (SVG target + shots), TargetLoupe, Modal + modalController,
                       UpdateBanner, shotMarker, targetLabels
 src/screens/          AthletesScreen, TrainingsScreen, TrainingScreen, RemarksScreen,
-                      SettingsScreen
+                      SettingsScreen, AllShotsScreen, GeneralRemarkScreen,
+                      ShotRemarkEditorScreen, TrainingRemarksScreen
 src/utils/            useWakeLock + wakeLockController
 src/styles/           tokens.css (design tokens), reset.css, common.module.css
 src/App.tsx           screen routing        src/main.tsx bootstrap      src/sw.ts service worker
@@ -99,7 +100,7 @@ docs/reference/CLOUDFLARE-FREE-CONSTRAINTS.md  limits of the free hosting tier
 ```
 
 All paths above (`src/…`, `docs/plans/…`, etc.) are relative to the **current worktree**, e.g.
-`main/src/scoring.ts`. Container layout (see §9 Worktrees):
+`main/src/scoring.ts`. Container layout (see §8 Worktrees):
 
 ```
 mushketon-coach/        # container, path never changes — the agent starts here
@@ -157,7 +158,7 @@ AI analysis history, streaming AI response.
 
 Done: scoring, transform, IndexedDB layer, domain repos, all five screens, shot remarks,
 backup/restore, PWA, CSP, GitHub Pages deploy workflow, Cloudflare Pages config,
-AI analysis (OpenRouter OAuth, free-model list, multi-training select, JSON prompt, modal response). Tests green (587).
+AI analysis (OpenRouter OAuth, free-model list, multi-training select, JSON prompt, modal response). Full test suite green.
 Partial: ISSF target visuals — verify against `docs/reference/CHANGES-TARGET-VISUAL.md` before touching.
 Missing: athlete switcher inside the training screen (`docs/plans/PLAN.md` §6).
 
@@ -168,7 +169,7 @@ Model and cost bindings per role live in the agent tool's own config, never in t
 
 | Task | Agent |
 | --- | --- |
-| Fast local recon: relevant files, entry points, data flow, risks | `scout` (read-only) |
+| Fast local recon: relevant files, entry points, data flow, risks; explicitly states whether `researcher` or `oracle` is needed | `scout` (read-only) |
 | External facts: web/docs research, brief with sources; never repo facts (that is `scout`) | `researcher` (read-only) |
 | Write code, edit files, run tests/build, deploy | `worker` (only agent that edits) |
 | Check worker's result vs task/plan, tests, edge cases, simplicity; report only | `reviewer` (read-only) |
@@ -182,6 +183,19 @@ never edits here, every fix goes back to `worker`.
 
 Default pipeline: `scout` (+ `researcher` when external facts matter) → plan → `worker` →
 `reviewer`, with `oracle` inserted before acting when the decision itself is risky.
+
+### When to dispatch researcher vs scout vs oracle
+
+`researcher` is a conditional gate after `scout`, not a default stage:
+- **`scout` first**: `scout` explores the local codebase and entry points, maps risks, and explicitly states whether `researcher` or `oracle` is needed.
+- **`researcher` (external facts only)**: run `researcher` only if external documentation, third-party library APIs/behavior, or specs are missing from the repository, local docs, and approved plan.
+- **`oracle` (architecture & risky decisions)**: run `oracle` when facing architectural choices, ambiguous product decisions, high-risk trade-offs, or after a worker fails twice. Do not use `researcher` for architectural/design decisions.
+
+Pipelines:
+- Standard repo task: `scout → worker → reviewer`
+- Task needing external facts/APIs: `scout → researcher → worker → reviewer`
+- Task needing risky architectural/design decision: `scout → oracle → worker → reviewer`
+- Combined (external unknown + architectural choice): `scout → researcher → oracle → worker → reviewer`
 
 Rule of thumb: `scout` before you understand the code, `researcher` before you trust external
 facts, `worker` to implement, `reviewer` to check, `oracle` when the decision feels risky,
