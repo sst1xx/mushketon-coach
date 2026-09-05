@@ -360,9 +360,9 @@ export default function TargetCanvas({
             magnified and unobstructed. */}
         {dragScreenPoint && (
           <g className={styles.crosshair}>
-            <circle cx={dragScreenPoint.px} cy={dragScreenPoint.py} r={1} fill="none" stroke="#e11d48" strokeWidth={0.5} />
-            <line x1={dragScreenPoint.px - 3} y1={dragScreenPoint.py} x2={dragScreenPoint.px + 3} y2={dragScreenPoint.py} stroke="#e11d48" strokeWidth={0.3} />
-            <line x1={dragScreenPoint.px} y1={dragScreenPoint.py - 3} x2={dragScreenPoint.px} y2={dragScreenPoint.py + 3} stroke="#e11d48" strokeWidth={0.3} />
+            <circle cx={dragScreenPoint.px} cy={dragScreenPoint.py} r={1} fill="none" stroke="var(--target-crosshair)" strokeWidth={0.5} />
+            <line x1={dragScreenPoint.px - 3} y1={dragScreenPoint.py} x2={dragScreenPoint.px + 3} y2={dragScreenPoint.py} stroke="var(--target-crosshair)" strokeWidth={0.3} />
+            <line x1={dragScreenPoint.px} y1={dragScreenPoint.py - 3} x2={dragScreenPoint.px} y2={dragScreenPoint.py + 3} stroke="var(--target-crosshair)" strokeWidth={0.3} />
           </g>
         )}
       </svg>

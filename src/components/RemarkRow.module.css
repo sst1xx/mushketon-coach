@@ -101,7 +101,7 @@
   color: var(--color-text-subtle);
 }
 .delBtn {
-  color: var(--color-danger, #c0392b);
+  color: var(--color-danger);
 }
 .editBtn:active,
 .delBtn:active {

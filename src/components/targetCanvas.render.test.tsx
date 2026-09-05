@@ -152,7 +152,7 @@ describe('TargetCanvas ring labels — full mode (render)', () => {
 describe('TargetCanvas crosshair and loupe HUD (render)', () => {
   it('renders no crosshair or loupe when not dragging', () => {
     const markup = renderMarkup('full');
-    expect(markup).not.toContain('e11d48');
+    expect(markup).not.toContain('target-crosshair');
   });
 
   it('renders a crosshair and loupe HUD while dragging', () => {
@@ -166,8 +166,8 @@ describe('TargetCanvas crosshair and loupe HUD (render)', () => {
       onDragCancel: noop,
     };
     const markup = renderToStaticMarkup(<TargetCanvas {...props} />);
-    // Crosshair color appears at least twice: once in the main canvas, once in the loupe.
-    const occurrences = markup.split('e11d48').length - 1;
+    // Crosshair token appears at least twice: once in the main canvas, once in the loupe.
+    const occurrences = markup.split('var(--target-crosshair)').length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 });

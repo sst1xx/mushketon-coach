@@ -26,9 +26,9 @@ export default function TargetLoupe({ centerPx, centerPy, cropSize, children }: 
         viewBox={`${centerPx - half} ${centerPy - half} ${cropSize} ${cropSize}`}
       >
         {children}
-        <circle cx={centerPx} cy={centerPy} r={1} fill="none" stroke="#e11d48" strokeWidth={0.5} />
-        <line x1={centerPx - 3} y1={centerPy} x2={centerPx + 3} y2={centerPy} stroke="#e11d48" strokeWidth={0.3} />
-        <line x1={centerPx} y1={centerPy - 3} x2={centerPx} y2={centerPy + 3} stroke="#e11d48" strokeWidth={0.3} />
+        <circle cx={centerPx} cy={centerPy} r={1} fill="none" stroke="var(--target-crosshair)" strokeWidth={0.5} />
+        <line x1={centerPx - 3} y1={centerPy} x2={centerPx + 3} y2={centerPy} stroke="var(--target-crosshair)" strokeWidth={0.3} />
+        <line x1={centerPx} y1={centerPy - 3} x2={centerPx} y2={centerPy + 3} stroke="var(--target-crosshair)" strokeWidth={0.3} />
       </svg>
     </div>
   );

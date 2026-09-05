@@ -33,6 +33,7 @@
   --color-primary-active: #000010;
   --color-primary-solid: var(--color-primary); /* used where primary bg carries white button text */
   --color-success: #15803d; /* WCAG AA: >=4.5:1 for white text on this bg and for this text color on --color-bg-app */
+  --color-success-solid: var(--color-success); /* WCAG AA: >=4.5:1 for white text on this bg */
   --color-selected: #3b82f6;
 
   /* Target visuals (TargetCanvas/TargetLoupe): ISSF geometry is unaffected —
@@ -44,6 +45,7 @@
   --target-center-dot: white;
   --target-label-outer: black;
   --target-label-inner: white;
+  --target-crosshair: #e11d48;
   --target-shot-regular-fill: black;
   --target-shot-emphasis-fill: #22C55E;
   --target-shot-selected-fill: #3B82F6;
@@ -93,6 +95,7 @@
   --color-primary-active: #14532d; /* --active is only used as solid-button :active bg; keep it >=4.5:1 for white text */
   --color-primary-solid: #15803d; /* WCAG AA: >=4.5:1 for white text on this bg */
   --color-success: #4ade80; /* WCAG AA: >=4.5:1 for this text color on --color-bg-app */
+  --color-success-solid: #15803d; /* WCAG AA: >=4.5:1 for white text on this bg */
   --color-selected: #22c55e;
 
   /* Target visuals: SIUS-style dark graphite-green target instead of a
@@ -107,6 +110,7 @@
   --target-center-dot: #7fdb9a;
   --target-label-outer: #cfe9d4;
   --target-label-inner: #7fdb9a;
+  --target-crosshair: #f43f5e;
   --target-shot-regular-fill: #1f6b3d;
   --target-shot-emphasis-fill: #22c55e;
   --target-shot-selected-fill: #3b82f6;

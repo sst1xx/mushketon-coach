@@ -40,7 +40,7 @@ describe('TargetCanvas readOnly rendering', () => {
         readOnly
       />,
     );
-    expect(markup).not.toContain('e11d48'); // no crosshair
+    expect(markup).not.toContain('target-crosshair'); // no crosshair
     const circles = extractCircles(markup);
     const innerCircles = circles.filter(c => c.attrs['stroke-width'] === '0.25');
     expect(innerCircles).toHaveLength(2);
