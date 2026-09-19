@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Workbox } from 'workbox-window';
 import App from './App';
 import UpdateBanner from './components/UpdateBanner';
+import UnsupportedBrowserScreen from './components/UnsupportedBrowserScreen';
+import { isTelegramWebView } from './utils/telegram';
 import './index.css';
 
 // Browser support check — IndexedDB + ServiceWorker required
@@ -55,14 +57,10 @@ function Root() {
 const container = document.getElementById('root')!;
 const root = createRoot(container);
 
-if (!isBrowserSupported()) {
-  root.render(
-    <div className="unsupported">
-      <h2>Браузер не поддерживается</h2>
-      <p>Для работы приложения необходимы IndexedDB и Service Worker.</p>
-      <p>Используйте Safari на iOS 16.4+ или Chrome на Android 10+.</p>
-    </div>
-  );
+const isTelegram = isTelegramWebView();
+
+if (isTelegram || !isBrowserSupported()) {
+  root.render(<UnsupportedBrowserScreen isTelegram={isTelegram} />);
 } else {
   root.render(<Root />);
 }
