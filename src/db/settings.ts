@@ -3,6 +3,7 @@
  */
 
 import { SCORING_VERSION } from '../scoring';
+import { DEFAULT_THEME_MODE } from '../utils/theme';
 import type { SettingsKey } from './schema';
 
 export async function getSetting(db: IDBDatabase, key: SettingsKey): Promise<any> {
@@ -31,5 +32,5 @@ export async function initSettings(db: IDBDatabase): Promise<void> {
    const zm = await getSetting(db, 'targetZoomMode');
   if (zm === null) await setSetting(db, 'targetZoomMode', 'full');
    const tm = await getSetting(db, 'themeMode');
-  if (tm === null) await setSetting(db, 'themeMode', 'light');
+  if (tm === null) await setSetting(db, 'themeMode', DEFAULT_THEME_MODE);
 }

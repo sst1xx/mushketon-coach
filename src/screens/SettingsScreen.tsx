@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { openDB } from '../db/open';
 import { getSetting, setSetting } from '../db/settings';
 import { exportBackup, importBackup, validateBackup } from '../domain/backupService';
-import { applyTheme, isThemeMode, type ThemeMode } from '../utils/theme';
+import { applyTheme, DEFAULT_THEME_MODE, isThemeMode, type ThemeMode } from '../utils/theme';
 import Modal from '../components/Modal';
 import AiAnalysisModal from '../components/AiAnalysisModal';
 import { generatePkce, getAuthUrl, fetchFreeModels } from '../ai/openrouter';
@@ -25,7 +25,7 @@ export default function SettingsScreen({ onBack }: Props) {
   const [storageInfo, setStorageInfo] = useState<{ usage: number; quota: number } | null>(null);
   const [storagePersisted, setStoragePersisted] = useState<boolean | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<unknown>(null);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_THEME_MODE);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Анализ с AI (see PLAN-AI-ANALYSIS.md §7)

@@ -10,17 +10,26 @@ import { renderFunctionComponentToElement } from '../testUtils/fakeHooks';
 // status, storageInfo, storagePersisted, confirmRestore, themeMode) directly
 // instead of relying on the effect.
 
-function renderScreen(themeMode: 'light' | 'dark') {
+function renderScreen(themeMode?: 'light' | 'dark') {
   const props = { onBack: () => {} };
+  const stateOverrides = themeMode !== undefined ? { 4: themeMode } : {};
   const element = renderFunctionComponentToElement(
     SettingsScreen as unknown as (p: typeof props) => React.ReactElement,
     props,
-    { 4: themeMode },
+    stateOverrides,
   );
   return renderToStaticMarkup(element!);
 }
 
 describe('SettingsScreen theme buttons', () => {
+  it('defaults to dark theme when no override is passed', () => {
+    const markup = renderScreen();
+    const lightMatch = markup.match(/<button[^>]*>Светлая<\/button>/);
+    const darkMatch = markup.match(/<button[^>]*>Тёмная<\/button>/);
+    expect(darkMatch![0]).toContain('aria-pressed="true"');
+    expect(lightMatch![0]).toContain('aria-pressed="false"');
+  });
+
   it('marks "Светлая" as pressed and "Тёмная" as not pressed when themeMode is light', () => {
     const markup = renderScreen('light');
     const lightMatch = markup.match(/<button[^>]*>Светлая<\/button>/);
